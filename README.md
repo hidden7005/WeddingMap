@@ -22,6 +22,7 @@ supabase/migrations/
   20261108000003_views.sql                계산 뷰 (예식 간격·동시예식, 지도용 목록·완성도, 이력+이름)
   20261108000004_rls.sql                  권한 정책
   20261108000005_advisor_fixes.sql        Supabase 보안 점검 지적 사항 보완
+  20261108000006_feedback_round1.sql      1단계 피드백: 업체차량 주차·외부스냅 필터·완성도 삭제, 닉네임, 예식장 추가
 supabase/setup_all.sql                    위 마이그레이션을 순서대로 합친 파일 (SQL Editor에 한 번에 붙여넣기용)
 supabase/seed.sql                         CSV를 변환한 upsert SQL (스크립트로 생성)
 scripts/import-venues.ts                  CSV → venues import
@@ -57,7 +58,6 @@ npm run import:venues       # .env.local 의 SERVICE_ROLE_KEY 로 upsert
 - Table Editor → `venues` : 821행 (wedding_hall 675 / hotel_4 68 / hotel_5 63 / auxiliary 15)
 - SQL Editor:
   ```sql
-  select completeness, count(*) from venue_map group by 1;            -- none 821
   select count(distinct road_address) from venue_map where same_address_count > 1;  -- 28
   ```
 - Authentication → Policies : 6개 테이블 모두 RLS 켜짐
@@ -74,11 +74,12 @@ npm run import:venues       # .env.local 의 SERVICE_ROLE_KEY 로 upsert
 - **최종 확인일**은 섹션별: 주차 `parking_checked_at`, 촬영 `photo_checked_at`, 홀 `halls.checked_at`(시간표 변경 시 함께 갱신), 주변 주차장 `checked_at`.
   섹션 값이 바뀌면 트리거가 자동 갱신. 값 변경 없이 "정보 맞음 확인"만 할 때는 앱이 `*_checked_at` 을 직접 보냄.
 - **수정 이력**: 로그인 사용자의 변경을 트리거가 필드 단위로 `edits` 에 자동 기록 (클라이언트는 쓰기 불가 → 위조 불가). import는 기록 안 함.
-- **완성도** (`venue_map.completeness`): 주차·홀·촬영 3개 섹션 중
-  - 주차 = 무료시간 / 주차규모 / 무료처리방법 / 업체차량 처리방법 중 하나라도 입력
-  - 홀 = 시간표가 있는 홀이 1개 이상
-  - 촬영 = 외부스냅 범위 / 원판 지정 여부 / 플래시 중 하나라도 입력
-  - 3개 모두 → `complete`(초록), 일부 → `partial`(노랑), 없음 → `none`(회색)
+- **수정자 표시**: 모든 테이블의 `updated_by`·`updated_at` = 마지막 수정자·날짜. `updated_by` 는 `profiles` 를 참조하므로
+  API에서 `halls?select=*,editor:profiles(nickname)` 로 닉네임을 함께 조회. 전체 이력은 `edits_with_user` 뷰.
+- **닉네임** (`profiles.nickname`): 2~20자, 대소문자 무시 중복 불가. 카카오 닉네임이 있으면 사용, 없으면 `작가xxxxxx`.
+  겹치면 뒤에 4자리를 붙임. 이메일은 공개되지 않음.
+- **사용자 추가 예식장**: `source = 'user'`, `source_key = 'u:' || id`, `created_by` = 추가한 사람 (서버 트리거가 채움).
+  좌표는 한국 범위(위도 33~39, 경도 124~132)만 허용.
 
 ## 권한 (RLS)
 
@@ -86,7 +87,9 @@ npm run import:venues       # .env.local 의 SERVICE_ROLE_KEY 로 upsert
 |---|---|---|
 | 모든 테이블·뷰 읽기 | ✅ | ✅ |
 | venues 주차·촬영 컬럼 수정 | ❌ | ✅ |
-| venues 원본 컬럼(이름·주소·좌표 등) 수정, 행 추가·삭제 | ❌ | ❌ (import 스크립트만) |
+| 예식장 추가 | ❌ | ✅ |
+| 사용자가 추가한 예식장의 이름·주소·좌표 수정 | ❌ | ✅ |
+| CSV 예식장의 이름·주소·좌표 수정, 예식장 삭제 | ❌ | ❌ (import 스크립트만) |
 | halls / hall_schedules / nearby_parking 추가·수정·삭제 | ❌ | ✅ |
 | edits 쓰기 | ❌ | ❌ (트리거만) |
 
@@ -96,7 +99,6 @@ npm run import:venues       # .env.local 의 SERVICE_ROLE_KEY 로 upsert
 |---|---|
 | `category` | wedding_hall 예식장업 · hotel_4 호텔(4성) · hotel_5 호텔(5성) · auxiliary 보조(다른 업종 등록) |
 | `guest_free_methods` (복수) | auto 자동 · front_desk 안내데스크 등록 · ticket 주차권 · plate_input 차량번호 입력 |
-| `vendor_parking_methods` (복수) | same_as_guest 하객과 동일 · auto · front_desk · ticket · plate_input · paid 유료 · not_allowed 주차 불가 |
 | `parking_capacity` | ample 넉넉 · normal 보통 · tight 협소 |
 | `external_snap_policy` | all_allowed 전부 허용 · no_official 원판만 불가 · ceremony_restricted 본식 제한 · no_external 외부 업체 불가 |
 | `official_photo_timing` | before 예식 전 선촬영 · after 예식 직후 · mixed 혼합 |
