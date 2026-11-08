@@ -8,7 +8,7 @@ Next.js(App Router) + TypeScript + Tailwind / Supabase / 네이버 지도.
 | 단계 | 내용 | 상태 |
 |---|---|---|
 | 1 | Supabase 스키마 + RLS + CSV import | ✅ 완료 (WeddingMap 프로젝트, 서울 리전에 적용됨) |
-| 2 | 지도 화면 (마커·클러스터·검색·상세 시트, 읽기 전용) | |
+| 2 | 지도 화면 (마커·클러스터·검색·상세 시트, 읽기 전용) | ✅ 완료 (확인 대기) |
 | 3 | 로그인 + 입력·수정 폼 + 수정 이력 | |
 | 4 | 필터, 완성도 색상, 공유 URL, 길찾기 | |
 | 5 | 배포 설정 (Vercel, 네이버 지도 허용 도메인) | |
@@ -27,6 +27,34 @@ supabase/setup_all.sql                    위 마이그레이션을 순서대로
 supabase/seed.sql                         CSV를 변환한 upsert SQL (스크립트로 생성)
 scripts/import-venues.ts                  CSV → venues import
 data/전국_예식장_목록_호텔포함.csv
+```
+
+## 앱 실행 (2단계~)
+
+```bash
+npm install
+npm run dev        # http://localhost:3000
+```
+
+- `.env.local` 필요: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_NAVER_MAP_CLIENT_ID`
+- 네이버 클라우드 콘솔 → Maps → Application 의 **Web 서비스 URL** 에 `http://localhost:3000` 이 등록돼 있어야 지도가 뜹니다.
+- 기타: `npm run build` (배포용 빌드), `npm run typecheck`, `npm test` (검색·주소 묶기·클러스터 단위 테스트)
+
+### 2단계에서 확인할 화면
+- **모바일**(폭 360~430px): 전체 화면 지도 + 상단 검색창. 마커를 누르면 하단 시트가 올라오고, 손잡이를 끌거나 탭하면 펼쳐짐.
+- **PC**(폭 1024px 이상): 왼쪽 400px 패널(검색·상세) + 오른쪽 지도.
+- 줌아웃하면 숫자 원(클러스터, 안의 예식장 수)으로 묶이고, 누르면 그 지역으로 확대.
+- 핀 안 숫자 = 같은 주소의 예식장 수 → 누르면 목록.
+- 핀 색: 빨강 웨딩홀 / 파랑 호텔 / 회색 기타 업종.
+- 상세: 주차 / 홀·시간 / 촬영 탭. 최종 확인일·수정자 닉네임 표시, 1년 넘은 정보는 흐리게. 동시예식은 노란색.
+- 주소창 `?v=<예식장 id>` 로 특정 예식장을 바로 열 수 있음 (4단계에서 `/venue/[id]` 공유 URL로 정리 예정).
+
+## 폴더 구조 (앱)
+
+```
+src/app/            layout, page (Next.js App Router)
+src/components/     MapApp(화면 전체), NaverMap(지도·클러스터), VenueDetail(상세 탭), BottomSheet, SearchBox
+src/lib/            supabase 클라이언트, DB 타입, 라벨·포맷, 주소 묶기·검색·클러스터 로직(+테스트)
 ```
 
 ## 1단계 실행 방법
