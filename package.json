@@ -1,0 +1,19 @@
+{
+  "name": "wedding-map",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "import:venues": "tsx --env-file=.env.local scripts/import-venues.ts",
+    "import:venues:dry": "tsx scripts/import-venues.ts --dry-run"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
+    "csv-parse": "^7.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
