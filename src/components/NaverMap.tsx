@@ -190,7 +190,7 @@ export default function NaverMap({
     <div className="relative isolate h-full w-full bg-slate-100">
       {CLIENT_ID && (
         <Script
-          src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${CLIENT_ID}`}
+          src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${CLIENT_ID}&ncpClientId=${CLIENT_ID}`}
           strategy="afterInteractive"
           onReady={() => setScriptReady(true)}
           onError={() => setAuthError(true)}
