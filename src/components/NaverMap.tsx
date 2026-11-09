@@ -57,6 +57,7 @@ export default function NaverMap({
   const [mapReady, setMapReady] = useState(false);
   const [authError, setAuthError] = useState(false);
   const [idleTick, setIdleTick] = useState(0);
+  const [origin, setOrigin] = useState("");
 
   // 최신 콜백을 ref로 들고 있어 마커 리스너를 매번 다시 달지 않아도 되게
   const onSelectRef = useRef(onSelectSite);
@@ -68,6 +69,7 @@ export default function NaverMap({
 
   useEffect(() => {
     window.navermap_authFailure = () => setAuthError(true);
+    setOrigin(window.location.origin);
     // 다른 페이지에서 돌아온 경우 스크립트가 이미 로드돼 있을 수 있음
     if (window.naver?.maps) setScriptReady(true);
   }, []);
@@ -202,8 +204,9 @@ export default function NaverMap({
             <p className="mt-2 text-slate-600">
               {!CLIENT_ID
                 ? ".env.local 에 NEXT_PUBLIC_NAVER_MAP_CLIENT_ID 를 넣어주세요."
-                : "네이버 클라우드 콘솔의 Maps Application에 지금 주소(예: http://localhost:3000)가 Web 서비스 URL로 등록돼 있는지 확인해주세요."}
+                : "네이버 클라우드 콘솔 → Maps → Application → 변경 → Web 서비스 URL에 아래 주소가 등록돼 있는지 확인해주세요. (저장 후 반영까지 몇 분 걸릴 수 있어요)"}
             </p>
+            {CLIENT_ID && <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 font-mono text-[13px] break-all select-all">{origin}</p>}
           </div>
         </div>
       )}
