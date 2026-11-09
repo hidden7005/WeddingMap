@@ -191,7 +191,7 @@ export default function VenueDetail({
         {tab === "photo" && <PhotoTab venue={venue} />}
 
         <p className="mt-6 rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">
-          정보 입력·수정은 로그인 기능과 함께 열릴 예정이에요.
+          정보 입력·수정 기능은 곧 열려요.
         </p>
         {venue.editor && (
           <p className="mt-2 text-center text-[11px] text-slate-400">

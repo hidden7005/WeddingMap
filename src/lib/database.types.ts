@@ -171,6 +171,60 @@ export type Database = {
           },
         ]
       }
+      members: {
+        Row: {
+          created_at: string
+          id: string
+          joined_at: string | null
+          name: string
+          note: string | null
+          phone: string
+          role: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          joined_at?: string | null
+          name: string
+          note?: string | null
+          phone: string
+          role?: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          joined_at?: string | null
+          name?: string
+          note?: string | null
+          phone?: string
+          role?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          id: boolean
+          require_login_to_view: boolean
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          require_login_to_view?: boolean
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          require_login_to_view?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       nearby_parking: {
         Row: {
           checked_at: string
@@ -459,6 +513,13 @@ export type Database = {
     }
     Functions: {
       _edit_ignored_columns: { Args: never; Returns: string[] }
+      can_view: { Args: never; Returns: boolean }
+      check_member: { Args: { p_name: string; p_phone: string }; Returns: boolean }
+      claim_session: { Args: never; Returns: string }
+      is_active_member: { Args: never; Returns: boolean }
+      is_admin: { Args: never; Returns: boolean }
+      normalize_phone: { Args: { p: string }; Returns: string }
+      session_status: { Args: never; Returns: Json }
       day_types_overlap: { Args: { a: string; b: string }; Returns: boolean }
     }
     Enums: {

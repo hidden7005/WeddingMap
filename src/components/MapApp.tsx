@@ -9,6 +9,9 @@ import VenueDetail from "./VenueDetail";
 import BottomSheet, { type SheetSnap } from "./BottomSheet";
 import { SearchInput, VenueList } from "./SearchBox";
 import { useMediaQuery } from "./useMediaQuery";
+import UserMenu from "./UserMenu";
+import { useAuth } from "./AuthProvider";
+import Link from "next/link";
 
 const PEEK_HEIGHT = 300;
 
@@ -16,6 +19,7 @@ type Selection = { venueId: string | null; siteKey: string } | null;
 
 export default function MapApp() {
   const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const auth = useAuth();
   const searchParams = useSearchParams();
 
   const [pins, setPins] = useState<VenuePin[] | null>(null);
@@ -39,7 +43,9 @@ export default function MapApp() {
         else setPins(toPins(data as never));
       });
   }, []);
-  useEffect(load, [load]);
+  useEffect(() => {
+    if (auth.status !== "loading") load();
+  }, [load, auth.status]);
 
   const sites = useMemo(() => (pins ? groupSites(pins) : []), [pins]);
   const siteByVenue = useMemo(() => {
@@ -153,15 +159,23 @@ export default function MapApp() {
     <div className="rounded-full bg-white/90 px-3 py-1.5 text-xs text-slate-600 shadow">예식장 불러오는 중…</div>
   ) : null;
 
+  if (auth.status === "loading" || auth.requireLogin === null) {
+    return <div className="flex h-dvh items-center justify-center text-sm text-slate-400">불러오는 중…</div>;
+  }
+  if (auth.requireLogin && auth.status !== "member") return <LoginGate />;
+
   /* ── PC: 왼쪽 패널 + 지도 ── */
   if (isDesktop) {
     return (
       <div className="flex h-dvh">
         <aside className="flex w-[400px] shrink-0 flex-col border-r border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-4">
-            <h1 className="mb-3 text-lg font-extrabold">
-              웨딩맵 <span className="text-sm font-medium text-slate-400">촬영자를 위한 예식장 지도</span>
-            </h1>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h1 className="text-lg font-extrabold">
+                웨딩맵 <span className="text-sm font-medium text-slate-400">촬영자를 위한 예식장 지도</span>
+              </h1>
+              <UserMenu />
+            </div>
             <SearchInput value={query} onChange={(v) => (setQuery(v), setSearchOpen(true))} onFocus={() => setSearchOpen(true)} />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -196,7 +210,10 @@ export default function MapApp() {
       {map}
 
       <div className="absolute inset-x-0 top-0 z-20 p-3" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
-        <SearchInput value={query} onChange={(v) => (setQuery(v), setSearchOpen(true))} onFocus={() => setSearchOpen(true)} />
+        <div className="flex gap-2">
+          <SearchInput className="min-w-0 flex-1" value={query} onChange={(v) => (setQuery(v), setSearchOpen(true))} onFocus={() => setSearchOpen(true)} />
+          <UserMenu compact />
+        </div>
         {searchOpen && query.trim() && (
           <div className="mt-2 max-h-[60dvh] overflow-y-auto rounded-xl bg-white shadow-lg">
             <VenueList items={results} onSelect={pickFromSearch} emptyText="검색 결과가 없어요" />
@@ -213,6 +230,20 @@ export default function MapApp() {
         </BottomSheet>
       )}
     </div>
+  );
+}
+
+function LoginGate() {
+  return (
+    <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-6 text-center">
+      <div>
+        <h1 className="text-2xl font-extrabold">웨딩맵</h1>
+        <p className="mt-2 text-sm text-slate-500">회원만 이용할 수 있어요.</p>
+        <Link href="/login" className="mt-6 inline-block rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white">
+          로그인
+        </Link>
+      </div>
+    </main>
   );
 }
 
