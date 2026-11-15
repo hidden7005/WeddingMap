@@ -318,6 +318,45 @@ export type Database = {
         }
         Relationships: []
       }
+      venue_notes: {
+        Row: {
+          author_id: string | null
+          body: string | null
+          created_at: string
+          id: string
+          photo_paths: string[]
+          section: string
+          updated_at: string
+          venue_id: string
+        }
+        Insert: {
+          id?: string
+          venue_id: string
+          section: string
+          body?: string | null
+          photo_paths?: string[]
+        }
+        Update: {
+          body?: string | null
+          photo_paths?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_notes_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venue_notes_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venues: {
         Row: {
           biz_no: string | null

@@ -18,6 +18,7 @@ import {
 } from "@/lib/labels";
 import { formatDate, formatMinutes, formatTime, formatWon, isStale, venueTitle } from "@/lib/format";
 import type { VenuePin } from "@/lib/sites";
+import VenueNotes from "./VenueNotes";
 
 type Editor = { editor: { nickname: string } | null };
 type Venue = Tables<"venues"> & Editor;
@@ -260,8 +261,7 @@ function ParkingTab({ venue, parking }: { venue: Venue; parking: Parking[] }) {
     venue.guest_free_minutes != null ||
     venue.parking_capacity != null ||
     (venue.guest_free_methods?.length ?? 0) > 0 ||
-    venue.overtime_fee != null ||
-    !!venue.parking_notes;
+    venue.overtime_fee != null;
 
   const overtime =
     venue.overtime_fee != null
@@ -277,7 +277,7 @@ function ParkingTab({ venue, parking }: { venue: Venue; parking: Parking[] }) {
             <Row label="초과 요금" value={overtime} />
             <Row label="무료 처리 방법" value={venue.guest_free_methods?.map((m) => label(GUEST_FREE_METHOD, m)).join(", ")} />
             <Row label="주차 규모" value={label(PARKING_CAPACITY, venue.parking_capacity)} />
-            <Row label="특이사항" value={venue.parking_notes} />
+            {venue.parking_notes && <Row label="메모" value={venue.parking_notes} />}
           </dl>
         ) : (
           <Empty>아직 입력된 주차 정보가 없어요</Empty>
@@ -304,6 +304,10 @@ function ParkingTab({ venue, parking }: { venue: Venue; parking: Parking[] }) {
         ) : (
           <Empty>등록된 주변 주차장이 없어요</Empty>
         )}
+      </Section>
+
+      <Section title="주차 특이사항">
+        <VenueNotes venueId={venue.id} section="parking" />
       </Section>
     </>
   );
@@ -373,10 +377,7 @@ function PhotoTab({ venue }: { venue: Venue }) {
     venue.external_vendor_fee != null ||
     venue.pass_required != null ||
     !!venue.equipment_route ||
-    !!venue.bridal_room_info ||
-    !!venue.photo_notes;
-
-  if (!hasInfo) return <Empty>아직 입력된 촬영 규정이 없어요</Empty>;
+    !!venue.bridal_room_info;
 
   const designated =
     venue.official_vendor_designated == null
@@ -386,18 +387,28 @@ function PhotoTab({ venue }: { venue: Venue }) {
         : "없음";
 
   return (
-    <Section title="촬영 규정" checkedAt={venue.photo_checked_at}>
-      <dl className="divide-y divide-slate-100">
-        <Row label="원판 지정 업체" value={designated} />
-        <Row label="외부 스냅" value={label(EXTERNAL_SNAP_POLICY, venue.external_snap_policy)} />
-        <Row label="원판 촬영 시점" value={label(OFFICIAL_PHOTO_TIMING, venue.official_photo_timing)} />
-        <Row label="플래시" value={label(FLASH_POLICY, venue.flash_policy)} />
-        <Row label="외부 업체 등록비" value={formatWon(venue.external_vendor_fee)} />
-        <Row label="출입증" value={venue.pass_required == null ? null : venue.pass_required ? "필요" : "불필요"} />
-        <Row label="장비 반입 동선" value={venue.equipment_route} />
-        <Row label="신부대기실" value={venue.bridal_room_info} />
-        <Row label="특이사항" value={venue.photo_notes} />
-      </dl>
-    </Section>
+    <>
+      <Section title="촬영 규정" checkedAt={venue.photo_checked_at}>
+        {hasInfo ? (
+          <dl className="divide-y divide-slate-100">
+            <Row label="원판 지정 업체" value={designated} />
+            <Row label="외부 스냅" value={label(EXTERNAL_SNAP_POLICY, venue.external_snap_policy)} />
+            <Row label="원판 촬영 시점" value={label(OFFICIAL_PHOTO_TIMING, venue.official_photo_timing)} />
+            <Row label="플래시" value={label(FLASH_POLICY, venue.flash_policy)} />
+            <Row label="외부 업체 등록비" value={formatWon(venue.external_vendor_fee)} />
+            <Row label="출입증" value={venue.pass_required == null ? null : venue.pass_required ? "필요" : "불필요"} />
+            <Row label="장비 반입 동선" value={venue.equipment_route} />
+            <Row label="신부대기실" value={venue.bridal_room_info} />
+            {venue.photo_notes && <Row label="메모" value={venue.photo_notes} />}
+          </dl>
+        ) : (
+          <Empty>아직 입력된 촬영 규정이 없어요</Empty>
+        )}
+      </Section>
+
+      <Section title="촬영 특이사항">
+        <VenueNotes venueId={venue.id} section="photo" />
+      </Section>
+    </>
   );
 }
