@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "./AuthProvider";
 
 export default function UserMenu({ compact = false }: { compact?: boolean }) {
-  const { status, member, session, signOut, refresh } = useAuth();
+  const { status, member, session, signOut, refresh, kakaoLinked, linkKakao } = useAuth();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -66,6 +66,14 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
           <button role="menuitem" onClick={() => (setEditing(true), setOpen(false))} className="block w-full px-4 py-2.5 text-left hover:bg-slate-50">
             닉네임 변경
           </button>
+          {kakaoLinked ? (
+            <p className="px-4 py-2.5 text-slate-400">카카오 연결됨 ✓</p>
+          ) : (
+            <button role="menuitem" onClick={linkKakao} className="block w-full px-4 py-2.5 text-left hover:bg-slate-50">
+              카카오 계정 연결
+              <span className="block text-xs text-slate-400">다음부터 문자 없이 로그인</span>
+            </button>
+          )}
           {member.role === "admin" && (
             <Link role="menuitem" href="/admin" className="block px-4 py-2.5 hover:bg-slate-50">
               관리자 페이지

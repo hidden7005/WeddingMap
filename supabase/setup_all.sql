@@ -957,8 +957,24 @@ as $$
   );
 $$;
 
--- 로그인 직후: 이 기기를 "현재 로그인"으로 등록 (이전 기기는 자동 로그아웃)
-create function public.claim_session()
+-- ---------------------------------------------------------------------
+-- login_events : 접속 기록 (관리자가 계정 공유 의심을 확인하는 용도)
+--   replaced_other = 다른 기기의 로그인을 밀어내고 들어온 경우 (= 기기 전환)
+-- ---------------------------------------------------------------------
+create table public.login_events (
+  id             bigint generated always as identity primary key,
+  user_id        uuid not null references auth.users (id) on delete cascade,
+  session_id     uuid not null,
+  method         text,              -- otp(문자) / oauth(카카오) 등, JWT amr 에서
+  device         text,              -- "iPhone · Safari" 같은 요약 (앱이 보냄)
+  user_agent     text,
+  replaced_other boolean not null default false,
+  created_at     timestamptz not null default now()
+);
+create index login_events_user_idx on public.login_events (user_id, created_at desc);
+
+-- 로그인 직후: 이 기기를 "현재 로그인"으로 등록 (이전 기기는 자동 로그아웃) + 접속 기록
+create function public.claim_session(p_device text default null, p_user_agent text default null)
 returns text
 language plpgsql
 security definer
@@ -967,6 +983,7 @@ as $$
 declare
   v_sid uuid := public._jwt_session_id();
   v_status text;
+  v_prev uuid;
 begin
   if auth.uid() is null or v_sid is null then
     return 'anonymous';
@@ -977,12 +994,35 @@ begin
   elsif v_status = 'suspended' then
     return 'suspended';
   end if;
+
+  select session_id into v_prev from public.active_sessions where user_id = auth.uid();
+  if v_prev is distinct from v_sid then
+    insert into public.login_events (user_id, session_id, method, device, user_agent, replaced_other)
+    values (auth.uid(), v_sid,
+            auth.jwt() -> 'amr' -> 0 ->> 'method',
+            left(p_device, 60), left(p_user_agent, 400),
+            v_prev is not null);
+  end if;
+
   insert into public.active_sessions (user_id, session_id, claimed_at)
   values (auth.uid(), v_sid, now())
   on conflict (user_id) do update set session_id = excluded.session_id, claimed_at = now();
   return 'ok';
 end;
 $$;
+
+-- 관리자용 회원별 접속 요약
+create view public.member_login_stats
+with (security_invoker = on) as
+select
+  e.user_id,
+  count(*) filter (where e.created_at > now() - interval '7 days')                         as logins_7d,
+  count(*) filter (where e.replaced_other and e.created_at > now() - interval '24 hours')  as switches_24h,
+  count(*) filter (where e.replaced_other and e.created_at > now() - interval '7 days')    as switches_7d,
+  count(distinct e.device) filter (where e.created_at > now() - interval '7 days')         as devices_7d,
+  max(e.created_at)                                                                         as last_login_at
+from public.login_events e
+group by e.user_id;
 
 -- 주기적 확인: ok / replaced(다른 기기 로그인) / suspended / not_member / unclaimed / anonymous
 create function public.session_status()
@@ -1022,6 +1062,13 @@ create policy "members: 관리자 수정"   on public.members for update to auth
 create policy "members: 관리자 삭제"   on public.members for delete to authenticated using ((select public.is_admin()));
 grant select, insert, update, delete on public.members to authenticated;
 revoke all on public.members from anon;
+
+-- login_events: 관리자만 읽기, 쓰기는 claim_session 함수만
+alter table public.login_events enable row level security;
+create policy "login_events: 관리자 읽기" on public.login_events for select to authenticated using ((select public.is_admin()));
+grant select on public.login_events, public.member_login_stats to authenticated;
+revoke insert, update, delete on public.login_events from anon, authenticated;
+revoke all on public.login_events, public.member_login_stats from anon;
 
 -- active_sessions: 함수로만 접근
 revoke all on public.active_sessions from anon, authenticated;
@@ -1081,8 +1128,8 @@ create policy "edits: 읽기" on public.edits for select to anon, authenticated 
 revoke execute on function
   public.members_normalize(), public.link_member_on_phone_confirm()
 from public, anon, authenticated;
-revoke execute on function public.claim_session(), public.session_status() from public, anon;
-grant execute on function public.claim_session(), public.session_status() to authenticated;
+revoke execute on function public.claim_session(text, text), public.session_status() from public, anon;
+grant execute on function public.claim_session(text, text), public.session_status() to authenticated;
 grant execute on function public.check_member(text, text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------

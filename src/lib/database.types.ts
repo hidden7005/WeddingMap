@@ -171,6 +171,21 @@ export type Database = {
           },
         ]
       }
+      login_events: {
+        Row: {
+          created_at: string
+          device: string | null
+          id: number
+          method: string | null
+          replaced_other: boolean
+          session_id: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       members: {
         Row: {
           created_at: string
@@ -490,6 +505,17 @@ export type Database = {
         }
         Relationships: []
       }
+      member_login_stats: {
+        Row: {
+          devices_7d: number | null
+          last_login_at: string | null
+          logins_7d: number | null
+          switches_24h: number | null
+          switches_7d: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
       venue_map: {
         Row: {
           branch_name: string | null
@@ -515,7 +541,7 @@ export type Database = {
       _edit_ignored_columns: { Args: never; Returns: string[] }
       can_view: { Args: never; Returns: boolean }
       check_member: { Args: { p_name: string; p_phone: string }; Returns: boolean }
-      claim_session: { Args: never; Returns: string }
+      claim_session: { Args: { p_device?: string; p_user_agent?: string }; Returns: string }
       is_active_member: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       normalize_phone: { Args: { p: string }; Returns: string }

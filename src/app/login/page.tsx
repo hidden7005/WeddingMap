@@ -19,8 +19,8 @@ function friendlyError(message: string): string {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { status, claim, refresh } = useAuth();
-  const [step, setStep] = useState<"info" | "code">("info");
+  const { status, claim, refresh, signInWithKakao, linkKakao } = useAuth();
+  const [step, setStep] = useState<"info" | "code" | "link">("info");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -30,8 +30,8 @@ export default function LoginPage() {
   const codeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (status === "member") router.replace("/");
-  }, [status, router]);
+    if (status === "member" && step !== "link") router.replace("/");
+  }, [status, step, router]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -74,6 +74,9 @@ export default function LoginPage() {
         throw new Error(r === "suspended" ? "이용이 정지된 계정이에요." : "회원 명단에 없는 번호예요. 관리자에게 문의해주세요.");
       }
       await refresh();
+      // 카카오 미연결이면 연결 권유 (다음부터 문자 없이 로그인)
+      const { data } = await supabase.auth.getUser();
+      if (!data.user?.identities?.some((i) => i.provider === "kakao")) return setStep("link");
       router.replace("/");
     } catch (e) {
       setError(friendlyError((e as Error).message));
@@ -97,7 +100,13 @@ export default function LoginPage() {
               }}
               className="space-y-4"
             >
-              <p className="text-sm text-slate-600">관리자에게 등록된 이름과 휴대폰 번호로 로그인해요.</p>
+              <KakaoButton onClick={signInWithKakao}>카카오로 로그인</KakaoButton>
+              <div className="flex items-center gap-3 text-xs text-slate-400">
+                <span className="h-px flex-1 bg-slate-200" />
+                처음이거나 카카오 연결 전이라면
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+              <p className="text-sm text-slate-600">관리자에게 등록된 이름과 휴대폰 번호로 인증해요.</p>
               <label className="block">
                 <span className="text-sm font-semibold">이름</span>
                 <input
@@ -122,9 +131,22 @@ export default function LoginPage() {
               </label>
               {error && <p className="text-sm text-rose-600">{error}</p>}
               <button disabled={busy} className="h-12 w-full rounded-xl bg-slate-900 font-semibold text-white disabled:opacity-50">
-                {busy ? "확인 중…" : "인증번호 받기"}
+                {busy ? "확인 중…" : "문자로 인증번호 받기"}
               </button>
             </form>
+          ) : step === "link" ? (
+            <div className="space-y-4 text-center">
+              <p className="text-lg font-bold">인증 완료!</p>
+              <p className="text-sm leading-relaxed text-slate-600">
+                카카오 계정을 연결하면 다음부터는
+                <br />
+                <b>카카오 버튼 한 번</b>으로 로그인돼요. (문자 인증 없이)
+              </p>
+              <KakaoButton onClick={linkKakao}>카카오 계정 연결하기</KakaoButton>
+              <button onClick={() => router.replace("/")} className="text-sm text-slate-500 hover:text-slate-900">
+                나중에 할게요
+              </button>
+            </div>
           ) : (
             <form
               onSubmit={(e) => {
@@ -174,5 +196,20 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+function KakaoButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] font-semibold text-[#191919] active:brightness-95"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+        <path fill="#191919" d="M12 3C6.48 3 2 6.58 2 11c0 2.86 1.88 5.37 4.7 6.78l-.96 3.5c-.08.3.26.54.52.37l4.17-2.77c.51.07 1.03.12 1.57.12 5.52 0 10-3.58 10-8S17.52 3 12 3z" />
+      </svg>
+      {children}
+    </button>
   );
 }

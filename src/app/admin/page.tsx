@@ -3,12 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import type { Tables } from "@/lib/database.types";
+import type { Tables, Views } from "@/lib/database.types";
 import { formatPhone, isValidKoreanMobile, normalizePhone, parseMemberLines } from "@/lib/phone";
 import { formatDate } from "@/lib/format";
 import { useAuth } from "@/components/AuthProvider";
 
-type Member = Tables<"members"> & { nickname?: string };
+type Stats = Views<"member_login_stats">;
+type Member = Tables<"members"> & { nickname?: string; stats?: Stats };
+
+/** 공유 의심 기준: 24시간 안에 기기 전환 4회 이상, 또는 7일간 12회 이상 */
+function isSuspicious(st?: Stats) {
+  return !!st && ((st.switches_24h ?? 0) >= 4 || (st.switches_7d ?? 0) >= 12);
+}
 
 const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
   invited: { text: "가입 전", cls: "bg-slate-100 text-slate-600" },
@@ -41,17 +47,30 @@ function Admin({ myUserId, requireLogin, onSettingsChanged }: { myUserId: string
   const [members, setMembers] = useState<Member[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [onlySuspicious, setOnlySuspicious] = useState(false);
+  const [openLog, setOpenLog] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data, error: e } = await supabase.from("members").select("*").order("created_at", { ascending: false });
     if (e) return setError(e.message);
     const ids = (data ?? []).map((m) => m.user_id).filter(Boolean) as string[];
     const nick = new Map<string, string>();
+    const stats = new Map<string, Stats>();
     if (ids.length) {
-      const { data: profiles } = await supabase.from("profiles").select("id,nickname").in("id", ids);
+      const [{ data: profiles }, { data: st }] = await Promise.all([
+        supabase.from("profiles").select("id,nickname").in("id", ids),
+        supabase.from("member_login_stats").select("*"),
+      ]);
       profiles?.forEach((p) => nick.set(p.id, p.nickname));
+      st?.forEach((x) => x.user_id && stats.set(x.user_id, x));
     }
-    setMembers((data ?? []).map((m) => ({ ...m, nickname: m.user_id ? nick.get(m.user_id) : undefined })));
+    setMembers(
+      (data ?? []).map((m) => ({
+        ...m,
+        nickname: m.user_id ? nick.get(m.user_id) : undefined,
+        stats: m.user_id ? stats.get(m.user_id) : undefined,
+      })),
+    );
   }, []);
   useEffect(() => {
     load();
@@ -59,12 +78,14 @@ function Admin({ myUserId, requireLogin, onSettingsChanged }: { myUserId: string
 
   const shown = useMemo(() => {
     const q = filter.replace(/\s/g, "");
-    if (!members || !q) return members ?? [];
+    const base = (members ?? []).filter((m) => !onlySuspicious || isSuspicious(m.stats));
+    if (!q) return base;
     const qPhone = q.replace(/\D/g, "");
-    return members.filter(
+    return base.filter(
       (m) => m.name.replace(/\s/g, "").includes(q) || (qPhone.length >= 3 && formatPhone(m.phone).replace(/\D/g, "").includes(qPhone)) || m.nickname?.includes(q),
     );
-  }, [members, filter]);
+  }, [members, filter, onlySuspicious]);
+  const suspiciousCount = useMemo(() => (members ?? []).filter((m) => isSuspicious(m.stats)).length, [members]);
 
   const counts = useMemo(() => {
     const c = { invited: 0, active: 0, suspended: 0 };
@@ -105,6 +126,10 @@ function Admin({ myUserId, requireLogin, onSettingsChanged }: { myUserId: string
               가입 {counts.active} · 가입 전 {counts.invited} · 정지 {counts.suspended}
             </p>
           </div>
+          <label className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm ${suspiciousCount ? "text-rose-700" : "text-slate-400"}`}>
+            <input type="checkbox" checked={onlySuspicious} onChange={(e) => setOnlySuspicious(e.target.checked)} />
+            공유 의심만 {suspiciousCount}
+          </label>
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -134,7 +159,14 @@ function Admin({ myUserId, requireLogin, onSettingsChanged }: { myUserId: string
                       {formatPhone(m.phone)}
                       {m.joined_at && <span className="ml-2 text-xs text-slate-400">가입 {formatDate(m.joined_at)}</span>}
                     </p>
+                    {m.stats && (
+                      <button onClick={() => setOpenLog(openLog === m.id ? null : m.id)} className="mt-0.5 text-left text-xs text-slate-500 hover:text-slate-900">
+                        최근 7일 로그인 {m.stats.logins_7d}회 · 기기 {m.stats.devices_7d}종 · 기기 전환 24시간 {m.stats.switches_24h}회 / 7일 {m.stats.switches_7d}회
+                        <span className="ml-1 underline">{openLog === m.id ? "접기" : "접속 기록"}</span>
+                      </button>
+                    )}
                   </div>
+                  {isSuspicious(m.stats) && <span className="rounded-md bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white">공유 의심</span>}
                   <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${st.cls}`}>{st.text}</span>
                   {!me && (
                     <div className="flex gap-1">
@@ -152,12 +184,16 @@ function Admin({ myUserId, requireLogin, onSettingsChanged }: { myUserId: string
                       </button>
                     </div>
                   )}
+                  {openLog === m.id && m.user_id && <LoginLog userId={m.user_id} />}
                 </li>
               );
             })}
           </ul>
         )}
-        <p className="mt-2 text-xs text-slate-400">정지하면 그 회원은 즉시 로그아웃되고 다시 로그인할 수 없어요.</p>
+        <p className="mt-2 text-xs text-slate-400">
+          정지하면 그 회원은 즉시 로그아웃되고 다시 로그인할 수 없어요. ‘기기 전환’은 다른 기기의 로그인을 밀어내고 들어온 횟수예요 —
+          24시간 4회 이상 또는 7일 12회 이상이면 ‘공유 의심’으로 표시돼요.
+        </p>
       </section>
     </main>
   );
@@ -257,5 +293,32 @@ function AddMembers({ existing, onAdded }: { existing: Member[]; onAdded: () => 
       )}
       {result && <p className="mt-2 text-sm text-emerald-700">{result}</p>}
     </section>
+  );
+}
+
+function LoginLog({ userId }: { userId: string }) {
+  const [rows, setRows] = useState<Tables<"login_events">[] | null>(null);
+  useEffect(() => {
+    supabase
+      .from("login_events")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(20)
+      .then(({ data }) => setRows(data ?? []));
+  }, [userId]);
+  if (!rows) return <p className="w-full text-xs text-slate-400">불러오는 중…</p>;
+  return (
+    <ul className="mt-1 w-full space-y-0.5 rounded-lg bg-slate-50 p-2 text-xs text-slate-600">
+      {rows.map((r) => (
+        <li key={r.id} className="flex flex-wrap gap-x-2">
+          <span className="tabular-nums text-slate-400">{new Date(r.created_at).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+          <span>{r.device ?? "알 수 없는 기기"}</span>
+          <span className="text-slate-400">{r.method === "oauth" ? "카카오" : r.method === "otp" ? "문자" : r.method ?? ""}</span>
+          {r.replaced_other && <span className="text-rose-600">다른 기기 밀어냄</span>}
+        </li>
+      ))}
+      {!rows.length && <li>기록 없음</li>}
+    </ul>
   );
 }
