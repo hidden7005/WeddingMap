@@ -825,7 +825,7 @@ $$;
 create table public.members (
   id         uuid primary key default gen_random_uuid(),
   name       text not null check (char_length(btrim(name)) between 1 and 30),
-  phone      text not null unique check (phone ~ '^82[0-9]{9,10}\Z'),
+  phone      text not null unique check (length(phone) between 11 and 12 and phone like '82%' and translate(phone, '0123456789', '') = ''),
   status     text not null default 'invited' check (status in ('invited', 'active', 'suspended')),
   role       text not null default 'member' check (role in ('member', 'admin')),
   user_id    uuid unique references auth.users (id) on delete set null,
@@ -1172,7 +1172,7 @@ revoke execute on function public.handle_new_user() from public, anon, authentic
 -- 주차·촬영 특이사항 (회원 글 + 사진 최대 4장)
 --   venue_notes   예식장 × 구역(parking/photo)별로 회원이 여러 개 올림. 최신순.
 --   사진 파일     Storage 버킷 'venue-photos' (비공개)
---                 경로: {venue_id}/{note_id}/{1..4}.jpg  (+ 썸네일 {n}_t.jpg)
+--                 경로: 예식장id/글id/1~4.jpg  (+ 썸네일 1~4_t.jpg)
 --   권한          보기 = can_view() / 쓰기 = 활성 회원 / 지우기 = 올린 본인 또는 관리자
 --   0007(회원·로그인) 다음에 적용해야 함
 -- =====================================================================
@@ -1212,7 +1212,9 @@ begin
   new.updated_at := now();
   new.body := nullif(btrim(new.body), '');
   foreach p in array new.photo_paths loop
-    if p !~ ('^' || new.venue_id || '/' || new.id || '/[1-4]\.jpg\Z') then
+    if not (p = any (array[
+        new.venue_id || '/' || new.id || '/1.jpg', new.venue_id || '/' || new.id || '/2.jpg',
+        new.venue_id || '/' || new.id || '/3.jpg', new.venue_id || '/' || new.id || '/4.jpg'])) then
       raise exception '사진 경로가 올바르지 않습니다: %', p using errcode = '22023';
     end if;
   end loop;
@@ -1257,8 +1259,11 @@ language sql stable
 security definer
 set search_path = public
 as $$
-  select p ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}/[1-4](_t)?\.jpg\Z'
-     and exists (select 1 from public.venues where id::text = split_part(p, '/', 1));
+  select split_part(p, '/', 4) = ''
+     and split_part(p, '/', 3) in ('1.jpg', '2.jpg', '3.jpg', '4.jpg', '1_t.jpg', '2_t.jpg', '3_t.jpg', '4_t.jpg')
+     and length(split_part(p, '/', 2)) = 36
+     and translate(split_part(p, '/', 2), '0123456789abcdef-', '') = ''
+     and exists (select 1 from public.venues where id::text = split_part(p, '/', 1))
 $$;
 
 create policy "venue-photos: 보기" on storage.objects for select to anon, authenticated

@@ -31,7 +31,7 @@ $$;
 create table public.members (
   id         uuid primary key default gen_random_uuid(),
   name       text not null check (char_length(btrim(name)) between 1 and 30),
-  phone      text not null unique check (phone ~ '^82[0-9]{9,10}\Z'),
+  phone      text not null unique check (length(phone) between 11 and 12 and phone like '82%' and translate(phone, '0123456789', '') = ''),
   status     text not null default 'invited' check (status in ('invited', 'active', 'suspended')),
   role       text not null default 'member' check (role in ('member', 'admin')),
   user_id    uuid unique references auth.users (id) on delete set null,
