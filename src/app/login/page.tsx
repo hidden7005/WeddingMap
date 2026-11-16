@@ -10,6 +10,7 @@ import { useAuth } from "@/components/AuthProvider";
 const RESEND_SECONDS = 60;
 
 function friendlyError(message: string): string {
+  if (/check_member|claim_session|schema cache|could not find the function/i.test(message)) return "로그인 기능은 준비 중이에요. 조금만 기다려주세요.";
   if (/expired|invalid/i.test(message) && /token|otp/i.test(message)) return "인증번호가 틀렸거나 만료됐어요. 다시 확인해주세요.";
   if (/rate|too many|security purposes/i.test(message)) return "요청이 너무 많아요. 잠시 후 다시 시도해주세요.";
   if (/member|명단/i.test(message)) return "회원 명단에 없는 번호예요. 관리자에게 문의해주세요.";

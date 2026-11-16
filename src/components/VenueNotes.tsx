@@ -27,6 +27,7 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
   const [notes, setNotes] = useState<Note[] | null>(null);
   const [urls, setUrls] = useState<Urls>({});
   const [error, setError] = useState<string | null>(null);
+  const [notReady, setNotReady] = useState(false);
   const [composing, setComposing] = useState(false);
   const [viewer, setViewer] = useState<{ note: Note; index: number } | null>(null);
 
@@ -38,7 +39,11 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
       .eq("venue_id", venueId)
       .eq("section", section)
       .order("created_at", { ascending: false });
-    if (e) return setError("특이사항을 불러오지 못했어요.");
+    if (e) {
+      // DB(0008)가 아직 적용되지 않은 경우: 오류 대신 "준비 중"
+      if (e.code === "PGRST205" || e.code === "42P01" || /venue_notes/.test(e.message ?? "")) return setNotReady(true);
+      return setError("특이사항을 불러오지 못했어요.");
+    }
     const list = (data ?? []) as Note[];
     setNotes(list);
     // 썸네일·원본 서명 URL 한 번에 받기
@@ -65,6 +70,10 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
     const { error: e } = await supabase.from("venue_notes").delete().eq("id", n.id);
     if (e) return alert("삭제하지 못했어요.");
     load();
+  }
+
+  if (notReady) {
+    return <p className="rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-400">특이사항·사진 기능은 곧 열려요</p>;
   }
 
   return (
