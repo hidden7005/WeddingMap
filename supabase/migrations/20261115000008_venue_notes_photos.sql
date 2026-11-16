@@ -42,7 +42,7 @@ begin
   new.updated_at := now();
   new.body := nullif(btrim(new.body), '');
   foreach p in array new.photo_paths loop
-    if p !~ ('^' || new.venue_id || '/' || new.id || '/[1-4]\.jpg$') then
+    if p !~ ('^' || new.venue_id || '/' || new.id || '/[1-4]\.jpg\Z') then
       raise exception '사진 경로가 올바르지 않습니다: %', p using errcode = '22023';
     end if;
   end loop;
@@ -87,7 +87,7 @@ language sql stable
 security definer
 set search_path = public
 as $$
-  select p ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}/[1-4](_t)?\.jpg$'
+  select p ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}/[1-4](_t)?\.jpg\Z'
      and exists (select 1 from public.venues where id::text = split_part(p, '/', 1));
 $$;
 
