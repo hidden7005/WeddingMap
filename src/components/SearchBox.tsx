@@ -28,7 +28,7 @@ export function SearchInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={onFocus}
-        placeholder="예식장명, 지역 검색 (예: 강남 웨딩)"
+        placeholder="예식장 검색"
         className="h-12 w-full rounded-xl border border-slate-200 bg-white pr-10 pl-10 text-[15px] shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-400 [&::-webkit-search-cancel-button]:hidden"
         aria-label="예식장 검색"
       />
