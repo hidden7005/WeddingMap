@@ -186,6 +186,11 @@ export default function MapApp() {
     )
   ) : null;
 
+  // 지도를 누르거나 끌기 시작하면 검색창 커서를 빼서 휴대폰 키보드를 내림
+  const blurSearch = () => {
+    const el = document.activeElement as HTMLElement | null;
+    if (el && el.matches("input, textarea")) el.blur();
+  };
   const map = (
     <NaverMap
       sites={sites}
@@ -262,7 +267,7 @@ export default function MapApp() {
           </div>
         </aside>
         <main className="relative min-w-0 flex-1">
-          {map}
+          <div className="absolute inset-0" onPointerDownCapture={blurSearch} onTouchStartCapture={blurSearch}>{map}</div>
           <div className="pointer-events-none absolute top-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 [&>*]:pointer-events-auto">
             {status}
             <AdminInbox onOpenVenue={(id) => selectVenue(id, { pan: true })} onVenueDeleted={() => (clearSelection(), load())} />
@@ -277,7 +282,7 @@ export default function MapApp() {
   /* ── 모바일: 전체 지도 + 상단 검색 + 하단 시트 ── */
   return (
     <div className="relative h-dvh overflow-hidden">
-      {map}
+      <div className="absolute inset-0" onPointerDownCapture={blurSearch} onTouchStartCapture={blurSearch}>{map}</div>
 
       <div className="absolute inset-x-0 top-0 z-20 p-3" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <div className="flex gap-2">
