@@ -284,7 +284,7 @@ export default function NaverMap({
           onError={() => setAuthError(true)}
         />
       )}
-      <div ref={containerRef} className="h-full w-full" />
+      <div ref={containerRef} className="relative z-0 h-full w-full" />
       {mapReady && (
         <button
           type="button"
