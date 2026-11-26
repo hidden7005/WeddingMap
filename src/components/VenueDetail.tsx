@@ -115,18 +115,18 @@ export default function VenueDetail({
       <div className="px-5 pt-1 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <span
-              className={`inline-block rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${
-                isHotel(venue.category) ? "bg-hotel-soft text-hotel" : venue.category === "auxiliary" ? "bg-slate-100 text-etc" : "bg-brand-soft text-brand"
-              }`}
-            >
-              {label(CATEGORY, venue.category)}
-              {venue.category === "auxiliary" && venue.registered_industry ? ` · ${venue.registered_industry}` : ""}
-            </span>
-            {venue.source === "user" && (
-              <span className="ml-1 inline-block rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700">사용자 추가</span>
-            )}
-            <h2 className="mt-1 text-lg leading-snug font-bold">{venueTitle(venue)}</h2>
+            {/* 홈페이지 소제목처럼 넓은 자간의 영문 분류 */}
+            <p className="wm-eyebrow flex flex-wrap items-center gap-x-2">
+              <span style={{ color: isHotel(venue.category) ? "var(--color-hotel)" : undefined }}>
+                {isHotel(venue.category) ? "Hotel" : venue.category === "auxiliary" ? "Etc" : "Wedding Hall"}
+              </span>
+              <span className="tracking-normal normal-case">
+                {label(CATEGORY, venue.category)}
+                {venue.category === "auxiliary" && venue.registered_industry ? ` · ${venue.registered_industry}` : ""}
+              </span>
+              {venue.source === "user" && <span className="tracking-normal text-amber-700 normal-case">사용자 추가</span>}
+            </p>
+            <h2 className="mt-1.5 text-[20px] leading-snug font-bold tracking-[-0.02em] text-slate-900">{venueTitle(venue)}</h2>
             <p className="mt-0.5 text-sm text-slate-600">
               {venue.road_address}
               {venue.floor ? ` ${venue.floor}층` : ""}
@@ -138,20 +138,24 @@ export default function VenueDetail({
             </svg>
           </button>
         </div>
-        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+        <div className="mt-2.5 space-y-0.5 text-sm">
           {venue.phone && (
-            <a href={`tel:${venue.phone}`} className="text-slate-700 underline-offset-2 hover:underline">
-              📞 {venue.phone}
-            </a>
+            <p>
+              <span className="inline-block w-14 text-slate-500">phone.</span>
+              <a href={`tel:${venue.phone}`} className="text-slate-600 underline-offset-2 hover:underline">
+                {venue.phone}
+              </a>
+            </p>
           )}
           {venue.homepage && (
             <a
               href={/^https?:\/\//.test(venue.homepage) ? venue.homepage : `https://${venue.homepage}`}
               target="_blank"
               rel="noreferrer"
-              className="text-slate-700 underline-offset-2 hover:underline"
+              className="block text-slate-600 underline-offset-2 hover:underline"
             >
-              🔗 홈페이지
+              <span className="inline-block w-14 text-slate-500">web.</span>
+              홈페이지 ↗
             </a>
           )}
         </div>
@@ -242,7 +246,7 @@ function Section({
   return (
     <section className={`mb-5 ${isStale(checkedAt) ? "opacity-50" : ""}`}>
       <div className="mb-1 flex items-baseline justify-between gap-2">
-        <h3 className="text-sm font-bold">{title}</h3>
+        <h3 className="text-[15px] font-bold text-slate-900">{title}</h3>
         <Checked at={checkedAt} by={checkedBy} />
       </div>
       {children}

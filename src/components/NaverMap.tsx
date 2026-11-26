@@ -278,7 +278,7 @@ export default function NaverMap({
           aria-label="현재 위치로 이동"
           title="현재 위치로 이동"
           aria-busy={locating}
-          className={`absolute z-10 flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#0071e3] shadow-[0_4px_18px_rgba(0,0,0,0.15)] transition active:scale-95 disabled:cursor-wait disabled:opacity-60 ${locateClassName}`}
+          className={`absolute z-10 flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-[0_4px_18px_rgba(0,0,0,0.15)] transition active:scale-95 disabled:cursor-wait disabled:opacity-60 ${locateClassName}`}
         >
           <svg viewBox="0 0 24 24" className="h-[23px] w-[23px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <circle cx="12" cy="12" r="7" />
