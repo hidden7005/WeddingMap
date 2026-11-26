@@ -7,10 +7,11 @@ begin;
 --   members.email        로그인에 쓰는 이메일 (소문자, 중복 불가)
 --   members.approved_at  관리자가 승인한 시각. null = 승인 대기(가입 신청)
 --                        관리자가 직접 등록한 이메일은 등록과 동시에 승인
---   members.phone        이제 선택 항목 (연락처 메모용)
+--   members.team         소속: AD(언아더데이) / AM(에이모먼트) / AF(언아더데이 필름)
+--   members.phone        이제 선택 항목 (예전 문자 로그인용, 새 가입 신청에서는 받지 않음)
 --
 --   흐름: 승인된 이메일 → 이메일 인증 코드로 로그인 → 회원과 자동 연결(active)
---         승인 안 된 이메일 → 가입 신청(request_access) → 관리자 승인 후 로그인
+--         승인 안 된 이메일 → 가입 신청(이름·이메일·소속) → 관리자 승인 후 로그인
 --
 --   SQL Editor 분할 문제를 피하려고 drop 명령과 정규식 기호를 쓰지 않음
 -- =====================================================================
@@ -19,11 +20,11 @@ begin;
 alter table public.members alter column phone drop not null;
 alter table public.members add column email text;
 alter table public.members add column approved_at timestamptz;
-alter table public.members add column request_note text;
+alter table public.members add column team text;
 alter table public.members add constraint members_email_format
   check (email is null or (email = lower(btrim(email)) and length(email) <= 254 and position('@' in email) > 1 and position('.' in split_part(email, '@', 2)) > 1));
 alter table public.members add constraint members_contact_present check (email is not null or phone is not null);
-alter table public.members add constraint members_request_note_len check (request_note is null or char_length(request_note) <= 300);
+alter table public.members add constraint members_team_check check (team is null or team in ('AD', 'AM', 'AF'));
 create unique index members_email_key on public.members (email);
 
 -- 기존 회원(관리자 포함)은 승인된 것으로
@@ -120,8 +121,8 @@ as $$
   ), 'unknown');
 $$;
 
--- 가입 신청: requested / already_pending / already_approved / suspended / invalid / too_many
-create function public.request_access(p_name text, p_email text, p_phone text default null, p_note text default null)
+-- 가입 신청 (이름·이메일·소속만): requested / already_pending / already_approved / suspended / invalid / too_many
+create function public.request_access(p_name text, p_email text, p_team text)
 returns text
 language plpgsql
 security definer
@@ -130,12 +131,13 @@ as $$
 declare
   v_email text := lower(btrim(coalesce(p_email, '')));
   v_name  text := btrim(coalesce(p_name, ''));
-  v_phone text := nullif(public.normalize_phone(p_phone), '');
+  v_team  text := upper(btrim(coalesce(p_team, '')));
   v_state text;
 begin
   if char_length(v_name) < 1 or char_length(v_name) > 30
      or length(v_email) > 254 or position('@' in v_email) < 2
-     or position('.' in split_part(v_email, '@', 2)) < 2 then
+     or position('.' in split_part(v_email, '@', 2)) < 2
+     or v_team not in ('AD', 'AM', 'AF') then
     return 'invalid';
   end if;
   v_state := public.email_login_status(v_email);
@@ -145,12 +147,7 @@ begin
   if (select count(*) from public.members where approved_at is null) >= 300 then
     return 'too_many';
   end if;
-  -- 연락처는 선택: 휴대폰 번호 형식이 아니면 버림
-  if v_phone is not null and not (length(v_phone) between 11 and 12 and v_phone like '821%') then
-    v_phone := null;
-  end if;
-  insert into public.members (name, email, phone, request_note)
-  values (v_name, v_email, v_phone, left(nullif(btrim(coalesce(p_note, '')), ''), 300));
+  insert into public.members (name, email, team) values (v_name, v_email, v_team);
   return 'requested';
 end;
 $$;
@@ -202,7 +199,7 @@ revoke execute on function
 from public, anon, authenticated;
 grant execute on function public.hook_before_user_created(jsonb) to supabase_auth_admin;
 grant execute on function public.email_login_status(text) to anon, authenticated;
-grant execute on function public.request_access(text, text, text, text) to anon, authenticated;
+grant execute on function public.request_access(text, text, text) to anon, authenticated;
 -- 문자 로그인용 함수는 더 이상 쓰지 않음
 revoke execute on function public.check_member(text, text) from public, anon, authenticated;
 
@@ -245,6 +242,23 @@ end;
 $$;
 create trigger members_sync_code after insert or update of member_code, user_id on public.members
   for each row execute function public.sync_member_code_to_profile();
+
+-- 아이디 앞부분(AD_ / AM_ / AF_)으로 소속이 비어 있으면 채움
+create function public.members_team_from_code()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.team is null and new.member_code is not null
+     and upper(split_part(new.member_code, '_', 1)) in ('AD', 'AM', 'AF') then
+    new.team := upper(split_part(new.member_code, '_', 1));
+  end if;
+  return new;
+end;
+$$;
+create trigger members_team_from_code before insert or update of member_code on public.members
+  for each row execute function public.members_team_from_code();
 
 -- 닉네임은 이제 관리자가 정하는 아이디 → 회원 본인 수정 막기 (관리자만)
 alter policy "profiles: 본인만 수정" on public.profiles
@@ -347,7 +361,7 @@ end;
 $$;
 
 -- ── 권한 ──
-revoke execute on function public.sync_member_code_to_profile() from public, anon, authenticated;
+revoke execute on function public.sync_member_code_to_profile(), public.members_team_from_code() from public, anon, authenticated;
 revoke execute on function public.admin_stats() from public, anon;
 grant execute on function public.admin_stats() to authenticated;
 grant execute on function public.record_visit(text) to anon, authenticated;

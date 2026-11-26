@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { isValidEmail, normalizeEmail } from "@/lib/members";
+import { TEAMS, suggestCode } from "@/lib/teams";
 import { useAuth } from "@/components/AuthProvider";
 
 const RESEND_SECONDS = 60;
@@ -28,8 +29,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [note, setNote] = useState("");
+  const [team, setTeam] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
@@ -106,14 +106,14 @@ export default function LoginPage() {
   async function requestAccess() {
     setError(null);
     if (!name.trim()) return setError("이름을 입력해주세요.");
+    if (!team) return setError("소속을 선택해주세요.");
     if (!isValidEmail(email)) return setError("이메일 주소를 정확히 입력해주세요.");
     setBusy(true);
     try {
       const { data: r, error: e } = await supabase.rpc("request_access", {
         p_name: name.trim(),
         p_email: normalizeEmail(email),
-        p_phone: phone.trim() || undefined,
-        p_note: note.trim() || undefined,
+        p_team: team,
       });
       if (e) throw e;
       if (r === "requested" || r === "already_pending") return setStep("requested");
@@ -217,18 +217,30 @@ export default function LoginPage() {
                 <span className="text-sm font-semibold">이름</span>
                 <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={30} className={inputCls} placeholder="홍길동" />
               </label>
-              <label className="block">
-                <span className="text-sm font-semibold">
-                  휴대폰 번호 <span className="font-normal text-slate-400">(선택, 관리자 확인용)</span>
-                </span>
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="numeric" autoComplete="tel" className={inputCls} placeholder="010-1234-5678" />
-              </label>
-              <label className="block">
-                <span className="text-sm font-semibold">
-                  한 줄 소개 <span className="font-normal text-slate-400">(선택)</span>
-                </span>
-                <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className={inputCls} placeholder="예: OO스냅 대표, 서울·경기 본식 스냅" />
-              </label>
+              <fieldset>
+                <legend className="text-sm font-semibold">소속</legend>
+                <div className="mt-1 grid grid-cols-1 gap-2">
+                  {TEAMS.map((t) => (
+                    <button
+                      key={t.code}
+                      type="button"
+                      onClick={() => (setTeam(t.code), setError(null))}
+                      aria-pressed={team === t.code}
+                      className={`flex h-12 items-center justify-between rounded-xl border px-4 text-[15px] ${
+                        team === t.code ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="font-semibold">{t.label}</span>
+                      <span className={`text-sm ${team === t.code ? "text-white/70" : "text-slate-400"}`}>{t.code}</span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              {team && name.trim() && (
+                <p className="text-sm text-slate-500">
+                  아이디: <b className="text-slate-900">{suggestCode(team, name)}</b>
+                </p>
+              )}
               {error && <p className="text-sm text-rose-600">{error}</p>}
               <button disabled={busy} className={primaryBtn}>
                 {busy ? "신청 중…" : "가입 신청"}

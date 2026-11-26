@@ -197,7 +197,7 @@ export type Database = {
           name: string
           note: string | null
           phone: string | null
-          request_note: string | null
+          team: string | null
           role: string
           status: string
           user_id: string | null
@@ -212,7 +212,7 @@ export type Database = {
           name: string
           note?: string | null
           phone?: string | null
-          request_note?: string | null
+          team?: string | null
           role?: string
           status?: string
           user_id?: string | null
@@ -227,7 +227,7 @@ export type Database = {
           name?: string
           note?: string | null
           phone?: string | null
-          request_note?: string | null
+          team?: string | null
           role?: string
           status?: string
           user_id?: string | null
@@ -597,7 +597,7 @@ export type Database = {
       can_view: { Args: never; Returns: boolean }
       record_visit: { Args: { p_visitor: string }; Returns: undefined }
       email_login_status: { Args: { p_email: string }; Returns: string }
-      request_access: { Args: { p_name: string; p_email: string; p_phone?: string; p_note?: string }; Returns: string }
+      request_access: { Args: { p_name: string; p_email: string; p_team: string }; Returns: string }
       claim_session: { Args: { p_device?: string; p_user_agent?: string }; Returns: string }
       is_active_member: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }

@@ -8,6 +8,7 @@ import { formatPhone } from "@/lib/phone";
 import { isValidMemberCode, parseMemberLines } from "@/lib/members";
 import { formatDate, venueTitle } from "@/lib/format";
 import { thumbPath } from "@/lib/image";
+import { suggestCode, teamLabel } from "@/lib/teams";
 import { DAY_TYPE, EXTERNAL_SNAP_POLICY, FLASH_POLICY, GUEST_FREE_METHOD, HALL_TYPE, OFFICIAL_PHOTO_TIMING, PARKING_CAPACITY } from "@/lib/labels";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -436,7 +437,9 @@ function MembersTab({ members, myUserId, reload }: { members: Member[] | null; m
             ))}
           </ul>
         )}
-        <p className="mt-2 text-xs text-slate-400">승인할 때 아이디(예: AD_홍길동, AM_홍순이, AF_홍강이)를 붙여주세요. 글·수정 이력에 이 아이디가 표시돼요.</p>
+        <p className="mt-2 text-xs text-slate-400">
+          아이디는 소속과 이름으로 미리 채워져 있어요 (언아더데이 AD_ · 에이모먼트 AM_ · 언아더데이 필름 AF_). 같은 이름이 있으면 고친 뒤 승인하세요.
+        </p>
       </section>
 
       <AddMembers existing={members ?? []} onAdded={reload} />
@@ -474,7 +477,10 @@ function MembersTab({ members, myUserId, reload }: { members: Member[] | null; m
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">
                       {m.member_code ?? <span className="text-amber-600">아이디 없음</span>}
-                      <span className="ml-1.5 text-xs font-normal text-slate-500">{m.name}</span>
+                      <span className="ml-1.5 text-xs font-normal text-slate-500">
+                        {m.name}
+                        {m.team && ` · ${teamLabel(m.team)}`}
+                      </span>
                       {m.role === "admin" && <span className="ml-1.5 text-xs font-normal text-slate-500">· 관리자</span>}
                       <button onClick={() => editCode(m)} className="ml-1.5 text-xs font-normal text-slate-400 underline hover:text-slate-900">
                         아이디 변경
@@ -526,20 +532,17 @@ function MembersTab({ members, myUserId, reload }: { members: Member[] | null; m
 }
 
 function PendingRow({ m, onApprove, onReject }: { m: Member; onApprove: (code: string) => Promise<boolean>; onReject: () => void }) {
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(() => suggestCode(m.team, m.name));
   const [busy, setBusy] = useState(false);
   const ok = isValidMemberCode(code);
   return (
     <li className="py-3 text-sm">
       <p className="font-semibold">
         {m.name}
+        {m.team && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-normal text-slate-600">{teamLabel(m.team)}</span>}
         <span className="ml-2 text-xs font-normal text-slate-400">신청 {formatDate(m.created_at)}</span>
       </p>
-      <p className="break-all text-slate-600">
-        {m.email}
-        {m.phone && <span className="ml-2 text-slate-400">{formatPhone(m.phone)}</span>}
-      </p>
-      {m.request_note && <p className="mt-0.5 text-xs text-slate-500">“{m.request_note}”</p>}
+      <p className="break-all text-slate-600">{m.email}</p>
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <input
           value={code}
@@ -583,7 +586,7 @@ function AddMembers({ existing, onAdded }: { existing: Member[]; onAdded: () => 
     const now = new Date().toISOString();
     const { error } = await supabase
       .from("members")
-      .insert(fresh.map((m) => ({ name: m.name, email: m.email, phone: m.phone, member_code: m.code, approved_at: now })));
+      .insert(fresh.map((m) => ({ name: m.name, email: m.email, phone: m.phone, member_code: m.code, team: m.team, approved_at: now })));
     setBusy(false);
     if (error) return setResult(error.code === "23505" ? "이미 등록된 이메일·아이디가 섞여 있어요. 확인 후 다시 시도해주세요." : "등록하지 못했어요: " + error.message);
     setResult(`${fresh.length}명을 승인 상태로 등록했어요. 이제 이 이메일로 로그인할 수 있어요.`);

@@ -38,6 +38,23 @@ $$;
 create trigger members_sync_code after insert or update of member_code, user_id on public.members
   for each row execute function public.sync_member_code_to_profile();
 
+-- 아이디 앞부분(AD_ / AM_ / AF_)으로 소속이 비어 있으면 채움
+create function public.members_team_from_code()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.team is null and new.member_code is not null
+     and upper(split_part(new.member_code, '_', 1)) in ('AD', 'AM', 'AF') then
+    new.team := upper(split_part(new.member_code, '_', 1));
+  end if;
+  return new;
+end;
+$$;
+create trigger members_team_from_code before insert or update of member_code on public.members
+  for each row execute function public.members_team_from_code();
+
 -- 닉네임은 이제 관리자가 정하는 아이디 → 회원 본인 수정 막기 (관리자만)
 alter policy "profiles: 본인만 수정" on public.profiles
   using ((select public.is_admin()))
@@ -139,7 +156,7 @@ end;
 $$;
 
 -- ── 권한 ──
-revoke execute on function public.sync_member_code_to_profile() from public, anon, authenticated;
+revoke execute on function public.sync_member_code_to_profile(), public.members_team_from_code() from public, anon, authenticated;
 revoke execute on function public.admin_stats() from public, anon;
 grant execute on function public.admin_stats() to authenticated;
 grant execute on function public.record_visit(text) to anon, authenticated;

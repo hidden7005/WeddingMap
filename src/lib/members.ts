@@ -28,7 +28,13 @@ export function nameFromCode(code: string): string {
   return (i >= 0 ? code.slice(i + 1) : code).trim() || code.trim();
 }
 
-export type ParsedMember = { name: string; email: string; phone: string | null; code: string | null };
+export type ParsedMember = { name: string; email: string; phone: string | null; code: string | null; team: string | null };
+
+/** 아이디 앞부분이 소속 코드면 소속으로 (AD_홍길동 → AD) */
+export function teamFromCode(code: string | null): string | null {
+  const t = code?.split("_")[0]?.toUpperCase();
+  return t === "AD" || t === "AM" || t === "AF" ? t : null;
+}
 
 /**
  * 관리자 일괄 등록: 한 줄에 "아이디, 이메일" 또는 "이름, 이메일" (휴대폰 번호는 있으면 함께, 순서 무관)
@@ -76,7 +82,7 @@ export function parseMemberLines(text: string): {
         return;
       }
       seen.add(email);
-      members.push({ name, email, phone, code: codeToken });
+      members.push({ name, email, phone, code: codeToken, team: teamFromCode(codeToken) });
     });
   return { members, errors };
 }
