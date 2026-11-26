@@ -1,24 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { isValidEmail, normalizeEmail } from "@/lib/members";
 import { TEAMS, suggestCode } from "@/lib/teams";
+import { MIN_PASSWORD, passwordProblem } from "@/lib/password";
 import { useAuth } from "@/components/AuthProvider";
 
-const RESEND_SECONDS = 60;
 const KAKAO_ENABLED = process.env.NEXT_PUBLIC_KAKAO_LOGIN === "on";
 
-type Step = "email" | "code" | "request" | "requested" | "pending" | "suspended" | "link";
+/**
+ * email     이메일 입력 → 상태 확인
+ * password  승인 + 계정 있음 → 비밀번호로 로그인
+ * setpw     승인 + 계정 없음(관리자가 직접 등록) → 비밀번호 만들기
+ * request   명단에 없음 → 가입 신청 (이름·소속·비밀번호)
+ */
+type Step = "email" | "password" | "setpw" | "request" | "requested" | "pending" | "suspended" | "confirm" | "resetSent" | "link";
 
 function friendlyError(message: string): string {
   if (/email_login_status|request_access|schema cache|could not find the function/i.test(message)) return "로그인 기능은 준비 중이에요. 조금만 기다려주세요.";
-  if (/승인된 이메일만/.test(message)) return "승인된 이메일만 로그인할 수 있어요. 가입 신청 후 관리자 승인을 기다려주세요.";
-  if (/expired|invalid/i.test(message) && /token|otp|code/i.test(message)) return "코드가 틀렸거나 만료됐어요. 메일을 다시 확인해주세요.";
+  if (/invalid login credentials/i.test(message)) return "이메일 또는 비밀번호가 맞지 않아요.";
+  if (/email not confirmed/i.test(message)) return "이메일 확인이 아직 안 됐어요. 메일함에서 확인 링크를 눌러주세요.";
+  if (/already registered|already been registered|user already exists/i.test(message)) return "이미 계정이 있는 이메일이에요. 비밀번호로 로그인해주세요.";
+  if (/가입 신청을 먼저/.test(message)) return "가입 신청을 먼저 해주세요.";
+  if (/password/i.test(message) && /(short|least|weak|characters)/i.test(message)) return `비밀번호를 ${MIN_PASSWORD}자 이상으로 더 복잡하게 만들어주세요.`;
   if (/rate|too many|security purposes|seconds/i.test(message)) return "요청이 너무 많아요. 잠시 후 다시 시도해주세요.";
-  if (/sending|smtp|email/i.test(message) && /error|fail/i.test(message)) return "메일을 보내지 못했어요. 잠시 후 다시 시도하거나 관리자에게 문의해주세요.";
   return message;
 }
 
@@ -27,36 +35,29 @@ export default function LoginPage() {
   const { status, claim, refresh, signInWithKakao, linkKakao } = useAuth();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
   const [name, setName] = useState("");
-  const [team, setTeam] = useState<string>("");
+  const [team, setTeam] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resendIn, setResendIn] = useState(0);
-  const codeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (status === "member" && step !== "link") router.replace("/");
   }, [status, step, router]);
 
-  useEffect(() => {
-    if (resendIn <= 0) return;
-    const t = setTimeout(() => setResendIn((s) => s - 1), 1000);
-    return () => clearTimeout(t);
-  }, [resendIn]);
-
-  /** 1) 이메일 확인 → 승인됐으면 로그인 코드 메일 발송 */
-  async function submitEmail() {
+  const go = (s: Step) => {
     setError(null);
-    if (!isValidEmail(email)) return setError("이메일 주소를 정확히 입력해주세요.");
+    setPassword("");
+    setPassword2("");
+    setStep(s);
+  };
+
+  async function run(fn: () => Promise<void>) {
+    setError(null);
     setBusy(true);
     try {
-      const { data: st, error: e1 } = await supabase.rpc("email_login_status", { p_email: normalizeEmail(email) });
-      if (e1) throw e1;
-      if (st === "pending") return setStep("pending");
-      if (st === "suspended") return setStep("suspended");
-      if (st !== "approved") return setStep("request");
-      await sendCode();
+      await fn();
     } catch (e) {
       setError(friendlyError((e as Error).message));
     } finally {
@@ -64,76 +65,119 @@ export default function LoginPage() {
     }
   }
 
-  async function sendCode() {
-    const { error: e } = await supabase.auth.signInWithOtp({
+  /** 로그인 성공 후: 이 기기를 현재 로그인으로 등록 (이전 기기는 자동 로그아웃) */
+  async function finishLogin() {
+    const r = await claim();
+    if (r !== "ok") {
+      await supabase.auth.signOut({ scope: "local" });
+      if (r === "suspended") return go("suspended");
+      return go("pending"); // 계정은 있지만 아직 승인 전
+    }
+    await refresh();
+    if (KAKAO_ENABLED) {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user?.identities?.some((i) => i.provider === "kakao")) return setStep("link");
+    }
+    router.replace("/");
+  }
+
+  const submitEmail = () =>
+    run(async () => {
+      if (!isValidEmail(email)) throw new Error("이메일 주소를 정확히 입력해주세요.");
+      const { data: st, error: e } = await supabase.rpc("email_login_status", { p_email: normalizeEmail(email) });
+      if (e) throw e;
+      if (st === "approved") return go("password");
+      if (st === "approved_new") return go("setpw");
+      if (st === "pending") return go("pending");
+      if (st === "suspended") return go("suspended");
+      go("request");
+    });
+
+  const login = () =>
+    run(async () => {
+      if (!password) throw new Error("비밀번호를 입력해주세요.");
+      const { error: e } = await supabase.auth.signInWithPassword({ email: normalizeEmail(email), password });
+      if (e) throw e;
+      await finishLogin();
+    });
+
+  /** 계정 만들기 (관리자가 직접 등록한 사람 / 가입 신청자 공통) */
+  async function createAccount(): Promise<"session" | "confirm"> {
+    const problem = passwordProblem(password, password2);
+    if (problem) throw new Error(problem);
+    const { data, error: e } = await supabase.auth.signUp({
       email: normalizeEmail(email),
-      options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}/auth/callback` },
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     if (e) throw e;
-    setStep("code");
-    setCode("");
-    setResendIn(RESEND_SECONDS);
-    setTimeout(() => codeRef.current?.focus(), 50);
+    // Supabase는 이미 있는 이메일이면 오류 대신 빈 계정을 돌려주기도 함
+    if (data.user && data.user.identities && data.user.identities.length === 0) throw new Error("already registered");
+    return data.session ? "session" : "confirm";
   }
 
-  /** 2) 메일로 받은 코드 확인 → 이 기기를 현재 로그인으로 등록 */
-  async function verify() {
-    setError(null);
-    if (!/^\d{6,10}$/.test(code)) return setError("메일로 받은 숫자 코드를 입력해주세요.");
-    setBusy(true);
-    try {
-      const { error: e } = await supabase.auth.verifyOtp({ email: normalizeEmail(email), token: code, type: "email" });
+  const setFirstPassword = () =>
+    run(async () => {
+      const r = await createAccount();
+      if (r === "confirm") return go("confirm");
+      await finishLogin();
+    });
+
+  const requestAccess = () =>
+    run(async () => {
+      if (!name.trim()) throw new Error("이름을 입력해주세요.");
+      if (!team) throw new Error("소속을 선택해주세요.");
+      const problem = passwordProblem(password, password2);
+      if (problem) throw new Error(problem);
+      const { data: r, error: e } = await supabase.rpc("request_access", { p_name: name.trim(), p_email: normalizeEmail(email), p_team: team });
       if (e) throw e;
-      const r = await claim();
-      if (r !== "ok") {
-        await supabase.auth.signOut({ scope: "local" });
-        throw new Error(r === "suspended" ? "이용이 정지된 계정이에요." : "승인된 회원 정보와 연결되지 않았어요. 관리자에게 문의해주세요.");
-      }
-      await refresh();
-      if (KAKAO_ENABLED) {
-        const { data } = await supabase.auth.getUser();
-        if (!data.user?.identities?.some((i) => i.provider === "kakao")) return setStep("link");
-      }
-      router.replace("/");
-    } catch (e) {
-      setError(friendlyError((e as Error).message));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /** 가입 신청 */
-  async function requestAccess() {
-    setError(null);
-    if (!name.trim()) return setError("이름을 입력해주세요.");
-    if (!team) return setError("소속을 선택해주세요.");
-    if (!isValidEmail(email)) return setError("이메일 주소를 정확히 입력해주세요.");
-    setBusy(true);
-    try {
-      const { data: r, error: e } = await supabase.rpc("request_access", {
-        p_name: name.trim(),
-        p_email: normalizeEmail(email),
-        p_team: team,
+      if (r === "already_approved") return go("password");
+      if (r === "suspended") return go("suspended");
+      if (r === "too_many") throw new Error("신청이 많이 밀려 있어요. 잠시 후 다시 시도하거나 관리자에게 직접 연락해주세요.");
+      if (r === "invalid") throw new Error("입력한 내용을 다시 확인해주세요.");
+      // requested / already_pending → 비밀번호 계정 만들기 (승인 전이라 아직 아무것도 못 봄)
+      const created = await createAccount().catch((err: Error) => {
+        if (/already/i.test(err.message)) return "exists" as const;
+        throw err;
       });
+      await supabase.auth.signOut({ scope: "local" });
+      go(created === "confirm" ? "confirm" : "requested");
+    });
+
+  const sendReset = () =>
+    run(async () => {
+      const { error: e } = await supabase.auth.resetPasswordForEmail(normalizeEmail(email), { redirectTo: `${window.location.origin}/auth/reset` });
       if (e) throw e;
-      if (r === "requested" || r === "already_pending") return setStep("requested");
-      if (r === "already_approved") return await sendCode();
-      if (r === "suspended") return setStep("suspended");
-      if (r === "too_many") return setError("신청이 많이 밀려 있어요. 잠시 후 다시 시도하거나 관리자에게 직접 연락해주세요.");
-      setError("입력한 내용을 다시 확인해주세요.");
-    } catch (e) {
-      setError(friendlyError((e as Error).message));
-    } finally {
-      setBusy(false);
-    }
-  }
+      go("resetSent");
+    });
 
   const inputCls = "mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-[15px] outline-none focus:border-slate-500";
   const primaryBtn = "h-12 w-full rounded-xl bg-slate-900 font-semibold text-white disabled:opacity-50";
   const backToEmail = (
-    <button type="button" onClick={() => (setStep("email"), setError(null))} className="text-sm text-slate-500 hover:text-slate-900">
+    <button type="button" onClick={() => go("email")} className="text-sm text-slate-500 hover:text-slate-900">
       ‹ 다른 이메일로
     </button>
+  );
+  const emailLine = (
+    <p className="text-sm text-slate-600">
+      <b className="break-all">{normalizeEmail(email)}</b>
+    </p>
+  );
+  const pwFields = (
+    <>
+      <label className="block">
+        <span className="text-sm font-semibold">
+          비밀번호 <span className="font-normal text-slate-400">({MIN_PASSWORD}자 이상, 영문+숫자)</span>
+        </span>
+        <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="new-password" className={inputCls} />
+      </label>
+      <label className="block">
+        <span className="text-sm font-semibold">비밀번호 확인</span>
+        <input value={password2} onChange={(e) => setPassword2(e.target.value)} type="password" autoComplete="new-password" className={inputCls} />
+        {password2 && password !== password2 && <span className="mt-1 block text-xs text-rose-600">비밀번호가 서로 달라요.</span>}
+        {password2 && password === password2 && password.length >= MIN_PASSWORD && <span className="mt-1 block text-xs text-emerald-600">비밀번호가 같아요.</span>}
+      </label>
+    </>
   );
 
   return (
@@ -151,57 +195,51 @@ export default function LoginPage() {
                   <Divider>또는 이메일로</Divider>
                 </>
               )}
-              <p className="text-sm text-slate-600">관리자가 승인한 이메일로 로그인해요. 비밀번호 없이 메일로 받은 코드를 입력하면 돼요.</p>
               <label className="block">
                 <span className="text-sm font-semibold">이메일</span>
                 <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" inputMode="email" autoComplete="email" className={inputCls} placeholder="you@example.com" />
               </label>
               {error && <p className="text-sm text-rose-600">{error}</p>}
               <button disabled={busy} className={primaryBtn}>
-                {busy ? "확인 중…" : "로그인 코드 받기"}
+                {busy ? "확인 중…" : "다음"}
               </button>
               <p className="text-center text-xs text-slate-400">처음이신가요? 이메일을 입력하면 가입 신청 화면으로 안내해요.</p>
             </form>
           )}
 
-          {step === "code" && (
-            <form onSubmit={(e) => (e.preventDefault(), verify())} className="space-y-4">
-              <p className="text-sm text-slate-600">
-                <b>{normalizeEmail(email)}</b> 로 보낸 메일의 <b>숫자 코드</b>를 입력해주세요. 메일 안의 로그인 링크를 눌러도 돼요.
-              </p>
-              <input
-                ref={codeRef}
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                className="h-14 w-full rounded-xl border border-slate-200 text-center text-2xl tracking-[0.4em] outline-none focus:border-slate-500"
-                placeholder="••••••"
-                aria-label="로그인 코드"
-              />
+          {step === "password" && (
+            <form onSubmit={(e) => (e.preventDefault(), login())} className="space-y-4">
+              {emailLine}
+              <label className="block">
+                <span className="text-sm font-semibold">비밀번호</span>
+                <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" autoComplete="current-password" autoFocus className={inputCls} />
+              </label>
               {error && <p className="text-sm text-rose-600">{error}</p>}
               <button disabled={busy} className={primaryBtn}>
-                {busy ? "확인 중…" : "로그인"}
+                {busy ? "로그인 중…" : "로그인"}
               </button>
               <div className="flex justify-between">
                 {backToEmail}
-                <button
-                  type="button"
-                  disabled={resendIn > 0 || busy}
-                  onClick={async () => {
-                    setError(null);
-                    try {
-                      await sendCode();
-                    } catch (e) {
-                      setError(friendlyError((e as Error).message));
-                    }
-                  }}
-                  className="text-sm text-slate-500 hover:text-slate-900 disabled:opacity-40"
-                >
-                  {resendIn > 0 ? `재전송 ${resendIn}초` : "코드 다시 받기"}
+                <button type="button" disabled={busy} onClick={sendReset} className="text-sm text-slate-500 hover:text-slate-900">
+                  비밀번호를 잊으셨나요?
                 </button>
               </div>
-              <p className="text-xs text-slate-400">메일이 안 보이면 스팸함도 확인해주세요.</p>
+            </form>
+          )}
+
+          {step === "setpw" && (
+            <form onSubmit={(e) => (e.preventDefault(), setFirstPassword())} className="space-y-4">
+              <div>
+                <p className="font-bold">비밀번호 만들기</p>
+                <p className="mt-1 text-sm text-slate-600">관리자가 등록한 이메일이에요. 앞으로 로그인할 때 쓸 비밀번호를 만들어주세요.</p>
+              </div>
+              {emailLine}
+              {pwFields}
+              {error && <p className="text-sm text-rose-600">{error}</p>}
+              <button disabled={busy} className={primaryBtn}>
+                {busy ? "만드는 중…" : "비밀번호 만들고 로그인"}
+              </button>
+              {backToEmail}
             </form>
           )}
 
@@ -209,10 +247,9 @@ export default function LoginPage() {
             <form onSubmit={(e) => (e.preventDefault(), requestAccess())} className="space-y-4">
               <div>
                 <p className="font-bold">가입 신청</p>
-                <p className="mt-1 text-sm text-slate-600">
-                  <b>{normalizeEmail(email)}</b> 은(는) 아직 승인되지 않은 이메일이에요. 신청하면 관리자 확인 후 로그인할 수 있어요.
-                </p>
+                <p className="mt-1 text-sm text-slate-600">신청하면 관리자 확인 후 로그인할 수 있어요.</p>
               </div>
+              {emailLine}
               <label className="block">
                 <span className="text-sm font-semibold">이름</span>
                 <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={30} className={inputCls} placeholder="홍길동" />
@@ -241,6 +278,7 @@ export default function LoginPage() {
                   아이디: <b className="text-slate-900">{suggestCode(team, name)}</b>
                 </p>
               )}
+              {pwFields}
               {error && <p className="text-sm text-rose-600">{error}</p>}
               <button disabled={busy} className={primaryBtn}>
                 {busy ? "신청 중…" : "가입 신청"}
@@ -250,23 +288,33 @@ export default function LoginPage() {
           )}
 
           {(step === "requested" || step === "pending") && (
-            <div className="space-y-3 text-center">
-              <p className="text-lg font-bold">{step === "requested" ? "신청이 접수됐어요" : "승인 대기 중이에요"}</p>
-              <p className="text-sm leading-relaxed text-slate-600">
-                관리자가 확인하고 승인하면
-                <br />
-                <b>{normalizeEmail(email)}</b> 로 로그인할 수 있어요.
-              </p>
-              {backToEmail}
-            </div>
+            <Message title={step === "requested" ? "신청이 접수됐어요" : "승인 대기 중이에요"}>
+              관리자가 확인하고 승인하면
+              <br />
+              <b>{normalizeEmail(email)}</b> 와 비밀번호로 로그인할 수 있어요.
+              <div className="mt-3">{backToEmail}</div>
+            </Message>
+          )}
+
+          {step === "confirm" && (
+            <Message title="메일함을 확인해주세요">
+              <b>{normalizeEmail(email)}</b> 로 보낸 메일의 확인 링크를 눌러주세요. 확인이 끝나면 로그인할 수 있어요. (승인 전이라면 승인 후에)
+              <div className="mt-3">{backToEmail}</div>
+            </Message>
+          )}
+
+          {step === "resetSent" && (
+            <Message title="비밀번호 재설정 메일을 보냈어요">
+              <b>{normalizeEmail(email)}</b> 로 보낸 메일의 링크를 눌러 새 비밀번호를 만들어주세요. 메일이 안 보이면 스팸함도 확인해주세요.
+              <div className="mt-3">{backToEmail}</div>
+            </Message>
           )}
 
           {step === "suspended" && (
-            <div className="space-y-3 text-center">
-              <p className="text-lg font-bold">이용이 정지된 계정이에요</p>
-              <p className="text-sm text-slate-600">관리자에게 문의해주세요.</p>
-              {backToEmail}
-            </div>
+            <Message title="이용이 정지된 계정이에요">
+              관리자에게 문의해주세요.
+              <div className="mt-3">{backToEmail}</div>
+            </Message>
           )}
 
           {step === "link" && (
@@ -297,6 +345,15 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+function Message({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3 text-center">
+      <p className="text-lg font-bold">{title}</p>
+      <div className="text-sm leading-relaxed text-slate-600">{children}</div>
+    </div>
   );
 }
 

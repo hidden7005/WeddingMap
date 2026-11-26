@@ -92,21 +92,22 @@ npm run import:venues       # .env.local 의 SERVICE_ROLE_KEY 로 upsert
   ```
 - Authentication → Policies : 6개 테이블 모두 RLS 켜짐
 
-## 로그인·회원 (이메일 + 관리자 승인)
+## 로그인·회원 (이메일 + 비밀번호, 관리자 승인)
 
-- **승인된 이메일만 로그인**: 관리자가 관리자 화면에서 이름·이메일을 등록(바로 승인)하거나, 회원이 로그인 화면에서 **가입 신청** → 관리자가 **승인**.
-- 로그인: 이메일 입력 → 메일로 받은 **숫자 코드** 입력 (또는 메일의 링크 클릭). 비밀번호 없음.
-- 첫 로그인 시 회원 명단과 자동 연결(`members.user_id`, status active).
-- **1기기 로그인**: 새 기기에서 로그인하면 이전 기기는 자동 로그아웃 (`active_sessions`).
-- 접속 기록(`login_events`)·공유 의심 표시, 화면 워터마크(이름·닉네임·날짜).
+- **가입 신청**: 이메일 → 이름 · 소속(언아더데이 AD / 에이모먼트 AM / 언아더데이 필름 AF) · 비밀번호(2번 입력, 8자 이상 영문+숫자).
+  아이디는 `소속_이름` (예: AM_홍순이) 으로 제안되고, 관리자가 승인할 때 확정.
+- **관리자 직접 등록**: 관리자 화면에 `아이디, 이메일` 붙여넣기 → 그 사람은 처음 들어올 때 비밀번호만 만들면 바로 로그인.
+- **로그인**: 이메일 + 비밀번호. 비밀번호 분실 시 재설정 메일(`/auth/reset`).
+- 계정과 회원 명단은 "관리자 승인 + 이메일 확인" 이 모두 되면 자동 연결.
+- 1기기 로그인, 접속 기록·공유 의심, 워터마크(이름·아이디·날짜), 로그인 필수 시작일.
 - 카카오 로그인(선택): Supabase 에 Kakao 공급자 설정 후 `NEXT_PUBLIC_KAKAO_LOGIN=on`.
 
 ### Supabase 설정 (대시보드)
-1. **Authentication → Sign In / Providers → Email**: 켜기, *Confirm email* 켜기.
-2. **Authentication → Emails → Magic Link** 템플릿에 코드 추가: `로그인 코드: {{ .Token }}` (링크와 함께 표시됨).
-3. **Authentication → URL Configuration**: Site URL `https://wedding-map.vercel.app`, Redirect URLs 에 `https://wedding-map.vercel.app/auth/callback`.
-4. (권장) **Authentication → Hooks → Before User Created** → Postgres → `public.hook_before_user_created` : 승인 안 된 이메일은 계정 생성 자체를 거부.
-5. **이메일 발송(SMTP)**: Supabase 기본 메일은 프로젝트 팀원 주소로만, 시간당 소량만 발송됨 → 실제 회원용으로는 **Custom SMTP** 설정 필요 (예: Resend, Gmail 앱 비밀번호).
+1. **Authentication → Sign In / Providers → Email**: 켜기. 비밀번호 최소 길이 8.
+2. **Confirm email**: 켜면 가입 때 확인 메일 → 본인 이메일임이 보장됨(메일 발송 필요). 끄면 메일 없이 바로 가입(관리자 승인만으로 확인).
+3. **Authentication → URL Configuration**: Site URL `https://wedding-map.vercel.app`, Redirect URLs 에 `https://wedding-map.vercel.app/auth/callback`, `https://wedding-map.vercel.app/auth/reset`.
+4. (권장) **Authentication → Hooks → Before User Created** → Postgres → `public.hook_before_user_created` : 가입 신청 안 한 이메일은 계정 생성 거부.
+5. **메일 발송(SMTP)**: 비밀번호 재설정(과 Confirm email 사용 시 확인 메일)에 필요. Supabase 기본 메일은 팀원 주소로만·소량 발송 → 실제 운영은 Custom SMTP(예: Resend).
 
 ## 데이터 설계 요점
 

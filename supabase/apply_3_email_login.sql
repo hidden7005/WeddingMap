@@ -1,4 +1,4 @@
--- [3] 웨딩맵: 이메일 로그인·관리자 승인(0009) + 회원 아이디·로그인 필수 시작일·방문 수·관리자 통계(0010)
+-- [3] 웨딩맵: 이메일+비밀번호 로그인·관리자 승인(0009) + 회원 아이디·로그인 필수 시작일·방문 수·관리자 통계(0010)
 -- PC 브라우저의 SQL Editor → + New → 전체 붙여넣기 → Run (한 번만)
 begin;
 -- =====================================================================
@@ -10,8 +10,9 @@ begin;
 --   members.team         소속: AD(언아더데이) / AM(에이모먼트) / AF(언아더데이 필름)
 --   members.phone        이제 선택 항목 (예전 문자 로그인용, 새 가입 신청에서는 받지 않음)
 --
---   흐름: 승인된 이메일 → 이메일 인증 코드로 로그인 → 회원과 자동 연결(active)
---         승인 안 된 이메일 → 가입 신청(이름·이메일·소속) → 관리자 승인 후 로그인
+--   흐름: 가입 신청(이메일·이름·소속·비밀번호) → 관리자 승인 → 이메일+비밀번호로 로그인
+--         관리자가 직접 등록한 이메일 → 처음 들어올 때 비밀번호를 만들고 바로 로그인
+--         계정(auth.users)과 회원(members)은 "승인 + 이메일 확인" 둘 다 됐을 때 자동 연결
 --
 --   SQL Editor 분할 문제를 피하려고 drop 명령과 정규식 기호를 쓰지 않음
 -- =====================================================================
@@ -103,7 +104,10 @@ create trigger members_link_on_approve before insert or update of approved_at, e
 
 -- ── 로그인 화면용 RPC ──
 
--- 이메일 상태: approved(로그인 가능) / pending(승인 대기) / suspended / unknown
+-- 이메일 상태
+--   approved     승인됨 + 계정(비밀번호) 있음 → 로그인
+--   approved_new 승인됨 + 아직 계정 없음(관리자가 직접 등록) → 비밀번호 만들기
+--   pending      승인 대기 / suspended 정지 / unknown 명단에 없음 → 가입 신청
 create function public.email_login_status(p_email text)
 returns text
 language sql stable
@@ -112,12 +116,14 @@ set search_path = public
 as $$
   select coalesce((
     select case
-      when status = 'suspended' then 'suspended'
-      when approved_at is null then 'pending'
-      else 'approved'
+      when m.status = 'suspended' then 'suspended'
+      when m.approved_at is null then 'pending'
+      when m.user_id is not null
+        or exists (select 1 from auth.users u where lower(u.email) = m.email) then 'approved'
+      else 'approved_new'
     end
-    from public.members
-    where email = lower(btrim(p_email))
+    from public.members m
+    where m.email = lower(btrim(p_email))
   ), 'unknown');
 $$;
 
@@ -141,7 +147,7 @@ begin
     return 'invalid';
   end if;
   v_state := public.email_login_status(v_email);
-  if v_state = 'approved' then return 'already_approved'; end if;
+  if v_state in ('approved', 'approved_new') then return 'already_approved'; end if;
   if v_state = 'pending' then return 'already_pending'; end if;
   if v_state = 'suspended' then return 'suspended'; end if;
   if (select count(*) from public.members where approved_at is null) >= 300 then
@@ -170,7 +176,8 @@ as $$
   );
 $$;
 
--- ── Supabase Auth Hook (선택, 권장): 승인 안 된 이메일은 계정 자체를 못 만들게 ──
+-- ── Supabase Auth Hook (선택, 권장): 명단에 없는 이메일은 계정 자체를 못 만들게 ──
+--   가입 신청(request_access)으로 명단에 올라간 이메일(승인 대기 포함)만 계정 생성 허용
 --   대시보드 → Authentication → Hooks → "Before User Created" → Postgres → 이 함수 선택
 create function public.hook_before_user_created(event jsonb)
 returns jsonb
@@ -183,13 +190,13 @@ declare
 begin
   if v_email <> '' and exists (
     select 1 from public.members
-     where email = v_email and approved_at is not null and status <> 'suspended'
+     where email = v_email and status <> 'suspended'
   ) then
     return jsonb_build_object();
   end if;
   return jsonb_build_object('error', jsonb_build_object(
     'http_code', 403,
-    'message', '승인된 이메일만 로그인할 수 있어요. 가입 신청 후 관리자 승인을 기다려주세요.'));
+    'message', '가입 신청을 먼저 해주세요.'));
 end;
 $$;
 
