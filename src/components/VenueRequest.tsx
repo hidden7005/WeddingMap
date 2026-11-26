@@ -45,8 +45,6 @@ export default function VenueRequestPrompt({ query }: { query: string }) {
 function RequestDialog({ initialName, onClose, onSent }: { initialName: string; onClose: () => void; onSent: () => void }) {
   const auth = useAuth();
   const [name, setName] = useState(initialName);
-  const [location, setLocation] = useState("");
-  const [memo, setMemo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,7 +53,7 @@ function RequestDialog({ initialName, onClose, onSent }: { initialName: string; 
     if (!name.trim()) return setError("예식장 이름을 적어주세요");
     setBusy(true);
     setError(null);
-    const { error } = await supabase.from("venue_requests").insert({ name: name.trim(), location: location.trim() || null, memo: memo.trim() || null });
+    const { error } = await supabase.from("venue_requests").insert({ name: name.trim() });
     setBusy(false);
     if (error) {
       if (error.code === "PGRST205" || error.code === "42P01") return setError("등록 요청 기능을 준비 중이에요. 잠시 후 다시 시도해주세요.");
@@ -94,12 +92,6 @@ function RequestDialog({ initialName, onClose, onSent }: { initialName: string; 
           <form onSubmit={submit} className="mt-5 space-y-4">
             <Field label="예식장 이름" required>
               <input value={name} onChange={(e) => setName(e.target.value)} maxLength={100} className={inputCls} placeholder="예: 더세인트" autoFocus />
-            </Field>
-            <Field label="주소 또는 위치" hint="도로명 주소, 지도 앱의 플러스코드(예: GV5Q+9F 서울) 등">
-              <input value={location} onChange={(e) => setLocation(e.target.value)} maxLength={300} className={inputCls} placeholder="예: 서울 구로구 경인로 662" />
-            </Field>
-            <Field label="메모">
-              <textarea value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={500} rows={3} className={`${inputCls} h-auto py-2.5`} placeholder="지점명, 홀 이름 등 알고 있는 내용" />
             </Field>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button disabled={busy} className="h-12 w-full rounded-xl bg-slate-900 font-semibold text-white disabled:opacity-50">
