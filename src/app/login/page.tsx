@@ -8,6 +8,7 @@ import { isValidEmail, normalizeEmail } from "@/lib/members";
 import { TEAMS, suggestCode } from "@/lib/teams";
 import { MIN_PASSWORD, passwordProblem } from "@/lib/password";
 import { useAuth } from "@/components/AuthProvider";
+import Logo, { APP_NAME } from "@/components/Logo";
 
 const KAKAO_ENABLED = process.env.NEXT_PUBLIC_KAKAO_LOGIN === "on";
 
@@ -183,8 +184,10 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-4 py-10">
       <div className="w-full max-w-sm">
-        <h1 className="text-center text-2xl font-extrabold">웨딩맵</h1>
-        <p className="mt-1 text-center text-sm text-slate-500">웨딩 촬영자를 위한 예식장 지도</p>
+        <h1 className="flex flex-col items-center gap-2">
+          <Logo className="h-10" />
+          <span className="text-base font-semibold text-slate-600">{APP_NAME}</span>
+        </h1>
 
         <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm">
           {step === "email" && (

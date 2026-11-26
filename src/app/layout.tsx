@@ -3,8 +3,9 @@ import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
-  title: "웨딩맵 — 웨딩 촬영자를 위한 예식장 지도",
-  description: "전국 예식장의 주차·홀 시간표·촬영 규정을 지도에서 확인하고 함께 채워가요.",
+  title: "언아더데이 맵",
+  applicationName: "언아더데이 맵",
+  description: "ANOTHERDAY PHOTO&FILM — 전국 예식장의 주차·홀 시간표·촬영 규정을 지도에서 확인하고 함께 채워가요.",
 };
 
 export const viewport: Viewport = {

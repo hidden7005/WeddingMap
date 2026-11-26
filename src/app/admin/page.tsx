@@ -11,6 +11,7 @@ import { thumbPath } from "@/lib/image";
 import { suggestCode, teamLabel } from "@/lib/teams";
 import { DAY_TYPE, EXTERNAL_SNAP_POLICY, FLASH_POLICY, GUEST_FREE_METHOD, HALL_TYPE, OFFICIAL_PHOTO_TIMING, PARKING_CAPACITY } from "@/lib/labels";
 import { useAuth } from "@/components/AuthProvider";
+import Logo, { APP_NAME } from "@/components/Logo";
 
 type Stats = Views<"member_login_stats">;
 type Member = Tables<"members"> & { nickname?: string; stats?: Stats };
@@ -99,7 +100,11 @@ function Admin({
   return (
     <main className="mx-auto max-w-3xl px-4 py-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-extrabold">웨딩맵 관리자</h1>
+        <h1 className="flex items-center gap-2.5">
+          <Logo variant="wordmark" className="h-4" />
+          <span className="h-5 w-px bg-slate-300" aria-hidden />
+          <span className="text-sm font-semibold text-slate-600">{APP_NAME} 관리자</span>
+        </h1>
         <Link href="/" className="text-sm text-slate-500 hover:text-slate-900">
           지도로 돌아가기 ›
         </Link>

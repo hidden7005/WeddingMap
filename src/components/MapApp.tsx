@@ -12,6 +12,7 @@ import { useMediaQuery } from "./useMediaQuery";
 import UserMenu from "./UserMenu";
 import { useAuth } from "./AuthProvider";
 import Link from "next/link";
+import Logo, { APP_NAME } from "./Logo";
 
 const PEEK_HEIGHT = 300;
 
@@ -171,8 +172,10 @@ export default function MapApp() {
         <aside className="flex w-[400px] shrink-0 flex-col border-r border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h1 className="text-lg font-extrabold">
-                웨딩맵 <span className="text-sm font-medium text-slate-400">촬영자를 위한 예식장 지도</span>
+              <h1 className="flex items-center gap-2.5">
+                <Logo variant="wordmark" className="h-4" />
+                <span className="h-5 w-px bg-slate-300" aria-hidden />
+                <span className="text-sm font-semibold text-slate-600">{APP_NAME}</span>
               </h1>
               <UserMenu />
             </div>
@@ -237,7 +240,10 @@ function LoginGate() {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-6 text-center">
       <div>
-        <h1 className="text-2xl font-extrabold">웨딩맵</h1>
+        <h1 className="flex flex-col items-center gap-2">
+          <Logo className="h-10" />
+          <span className="text-base font-semibold text-slate-600">{APP_NAME}</span>
+        </h1>
         <p className="mt-2 text-sm text-slate-500">회원만 이용할 수 있어요.</p>
         <Link href="/login" className="mt-6 inline-block rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white">
           로그인

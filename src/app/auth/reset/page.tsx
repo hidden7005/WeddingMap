@@ -6,6 +6,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { MIN_PASSWORD, passwordProblem } from "@/lib/password";
 import { useAuth } from "@/components/AuthProvider";
+import Logo from "@/components/Logo";
 
 /** 비밀번호 재설정 메일의 링크를 누르면 오는 곳: 새 비밀번호 두 번 입력 */
 export default function ResetPassword() {
@@ -56,6 +57,7 @@ export default function ResetPassword() {
   return (
     <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-4 py-10">
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sm">
+        <Logo className="mx-auto mb-5 h-8" />
         <h1 className="text-lg font-bold">새 비밀번호 만들기</h1>
         {ready === null && <p className="mt-3 text-sm text-slate-500">확인 중…</p>}
         {ready === false && (
