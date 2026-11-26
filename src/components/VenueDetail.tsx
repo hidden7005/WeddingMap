@@ -43,9 +43,9 @@ type Detail = {
 };
 
 const TABS = [
-  { key: "parking", label: "주차" },
-  { key: "halls", label: "홀·시간" },
   { key: "photo", label: "촬영" },
+  { key: "halls", label: "홀·시간" },
+  { key: "parking", label: "주차" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -97,7 +97,7 @@ export default function VenueDetail({
 }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabKey>("parking");
+  const [tab, setTab] = useState<TabKey>("photo");
   const [reload, setReload] = useState(0);
   const auth = useAuth();
   const canEdit = auth.status === "member";
@@ -286,11 +286,6 @@ export default function VenueDetail({
         )}
         {tab === "photo" && <PhotoTab venue={venue} />}
 
-        {!canEdit && (
-          <p className="mt-6 rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">
-            승인된 회원은 로그인하면 정보를 수정할 수 있어요.
-          </p>
-        )}
         {venue.editor && (
           <p className="mt-2 text-center text-[11px] text-slate-400">
             마지막 수정 {venue.editor.nickname} · {formatDate(venue.updated_at)}
@@ -640,6 +635,15 @@ function HallsTab({
                       </>
                     ) : (
                       <span className="text-slate-300">시간표 미입력</span>
+                    )}
+                    {/* 로그인한 회원은 바로 시간 입력 */}
+                    {canEdit && (
+                      <button
+                        onClick={() => setEditing(h.id)}
+                        className="ml-2 rounded-md bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white"
+                      >
+                        + 시간 입력
+                      </button>
                     )}
                   </p>
                 )}

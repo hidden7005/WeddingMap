@@ -167,7 +167,7 @@ export default function MapApp() {
       bottomInset={!isDesktop && selection ? halfHeight : 0}
       showZoomControl={isDesktop}
       autoLocate={!searchParams.get("v")}
-      locateClassName={isDesktop ? "right-4 bottom-16" : "right-3 bottom-6"}
+      locateClassName={isDesktop ? "right-4 bottom-6" : "right-3 bottom-6"}
     />
   );
 
@@ -225,7 +225,7 @@ export default function MapApp() {
         <main className="relative min-w-0 flex-1">
           {map}
           <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 [&>*]:pointer-events-auto">{status}</div>
-          <Legend className="absolute right-4 bottom-6" />
+          <Legend className="absolute right-[4.5rem] bottom-6" />
           <VersionBadge className="absolute bottom-11 left-3" />
         </main>
       </div>
@@ -246,7 +246,7 @@ export default function MapApp() {
             className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-a.png" alt="ANOTHERDAY" className="h-8 w-8" draggable={false} />
+            <img src="/logo-a.png" alt="ANOTHERDAY" className="h-6 w-6" draggable={false} />
           </button>
           <SearchInput className="min-w-0 flex-1" value={query} onChange={(v) => (setQuery(v), setSearchOpen(true))} onFocus={() => setSearchOpen(true)} />
           <UserMenu compact />
@@ -296,7 +296,7 @@ function Legend({ className = "" }: { className?: string }) {
     </span>
   );
   return (
-    <div className={`flex gap-3 rounded-full bg-white/95 px-3 py-1.5 text-xs text-slate-600 shadow ${className}`}>
+    <div className={`flex h-11 items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-4 text-xs text-slate-600 shadow-sm ${className}`}>
       <Item color="var(--color-brand)" text="웨딩홀" />
       <Item color="var(--color-hotel)" text="호텔" />
       <Item color="var(--color-etc)" text="기타" />
