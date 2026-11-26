@@ -118,26 +118,20 @@ export function HallEditor({
   const [hallType, setHallType] = useState<string | null>(
     hall?.hall_type ?? null,
   );
-  const fmt = (l: string[]) => l.map(formatTime).join(" ");
+  const fmt = (l: string[]) => l.map(formatTime).sort();
   // 토·일 시간이 다르면 따로 입력
   const [split, setSplit] = useState(initialTimes.sat.length > 0 || initialTimes.sun.length > 0);
-  const [timesText, setTimesText] = useState(fmt(initialTimes.common));
-  const [satText, setSatText] = useState(fmt(initialTimes.sat));
-  const [sunText, setSunText] = useState(fmt(initialTimes.sun));
+  const [common, setCommon] = useState<string[]>(fmt(initialTimes.common));
+  const [sat, setSat] = useState<string[]>(fmt(initialTimes.sat));
+  const [sun, setSun] = useState<string[]>(fmt(initialTimes.sun));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const parsed = parseTimes(timesText);
-  const parsedSat = parseTimes(satText);
-  const parsedSun = parseTimes(sunText);
-  const invalid = split ? [...parsedSat.invalid, ...parsedSun.invalid] : parsed.invalid;
-  const hasTimes = split ? parsedSat.times.length + parsedSun.times.length > 0 : parsed.times.length > 0;
+  const hasTimes = split ? sat.length + sun.length > 0 : common.length > 0;
   const createdHallId = useRef<string | undefined>(undefined);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (invalid.length)
-      return setError(`알아볼 수 없는 시간: ${invalid.join(", ")}`);
     setBusy(true);
     setError(null);
     const row = {
@@ -168,8 +162,8 @@ export function HallEditor({
     }
     // 시간표: 요일별로 바뀐 것만 지우고 추가 (그대로인 시간은 기록을 남기지 않음)
     const want: Record<"common" | "sat" | "sun", string[]> = split
-      ? { common: [], sat: parsedSat.times, sun: parsedSun.times }
-      : { common: parsed.times, sat: [], sun: [] };
+      ? { common: [], sat, sun }
+      : { common, sat: [], sun: [] };
     const days = ["common", "sat", "sun"] as const;
     const plan = days.map((d) => {
       const before = new Set(initialTimes[d].map(formatTime));
@@ -261,7 +255,7 @@ export function HallEditor({
       </Field>
       <Field
         label="예식 시간"
-        hint="띄어쓰기로 구분해서 입력 (예: 11:00 12:30 14:00 15:30 17:00)"
+        hint="1130, 11:30, 오전 11시처럼 적고 엔터 · 여러 개는 띄어쓰기로 한 번에"
       >
         <div className="mb-2 flex gap-1.5">
           <Chip on={!split} onClick={() => setSplit(false)}>
@@ -271,9 +265,9 @@ export function HallEditor({
             on={split}
             onClick={() => {
               // 처음 나눌 때는 지금 시간을 토·일 둘 다에 채워 둠
-              if (!split && !satText && !sunText) {
-                setSatText(timesText);
-                setSunText(timesText);
+              if (!split && !sat.length && !sun.length) {
+                setSat(common);
+                setSun(common);
               }
               setSplit(true);
             }}
@@ -283,11 +277,11 @@ export function HallEditor({
         </div>
         {split ? (
           <div className="space-y-3">
-            <TimesInput label="토요일" value={satText} onChange={setSatText} parsed={parsedSat} />
-            <TimesInput label="일요일" value={sunText} onChange={setSunText} parsed={parsedSun} />
+            <TimeChips label="토요일" value={sat} onChange={setSat} />
+            <TimeChips label="일요일" value={sun} onChange={setSun} />
           </div>
         ) : (
-          <TimesInput value={timesText} onChange={setTimesText} parsed={parsed} />
+          <TimeChips value={common} onChange={setCommon} />
         )}
       </Field>
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -310,31 +304,56 @@ export function HallEditor({
   );
 }
 
-function TimesInput({
-  label,
-  value,
-  onChange,
-  parsed,
-}: {
-  label?: string;
-  value: string;
-  onChange: (v: string) => void;
-  parsed: ReturnType<typeof parseTimes>;
-}) {
+/** 예식 시간: 넣은 시간은 칩(× 로 빼기), 아래 칸에 적고 엔터/추가 */
+function TimeChips({ label, value, onChange }: { label?: string; value: string[]; onChange: (v: string[]) => void }) {
+  const [text, setText] = useState("");
+  const [bad, setBad] = useState<string[]>([]);
+  const add = () => {
+    if (!text.trim()) return;
+    const p = parseTimes(text);
+    if (p.times.length) onChange([...new Set([...value, ...p.times])].sort());
+    setBad(p.invalid);
+    setText(p.invalid.join(" ")); // 못 알아본 것만 남겨서 고치게
+  };
   return (
     <div>
       {label && <p className="mb-1 text-xs font-semibold text-slate-500">{label}</p>}
-      <input value={value} onChange={(e) => onChange(e.target.value)} inputMode="text" aria-label={label ? `${label} 예식 시간` : "예식 시간"} className={inputCls} placeholder="11:00 15:00 18:00" />
-      {parsed.times.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {parsed.times.map((t) => (
-            <span key={t} className="rounded-lg bg-white px-2 py-1 text-sm font-semibold text-slate-800 ring-1 ring-slate-200">
+      {value.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {value.map((t) => (
+            <span key={t} className="inline-flex items-center gap-0.5 rounded-lg bg-white py-1 pr-1 pl-2 text-sm font-semibold text-slate-800 ring-1 ring-slate-200">
               {t}
+              <button type="button" onClick={() => onChange(value.filter((x) => x !== t))} aria-label={`${t} 빼기`} className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
             </span>
           ))}
         </div>
       )}
-      {parsed.invalid.length > 0 && <p className="mt-1.5 text-xs text-red-600">알아볼 수 없는 시간: {parsed.invalid.join(", ")}</p>}
+      <div className="flex gap-1.5">
+        <input
+          value={text}
+          onChange={(e) => (setText(e.target.value), setBad([]))}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              e.preventDefault(); // 폼 저장 대신 시간 추가
+              add();
+            }
+          }}
+          onBlur={add}
+          inputMode="text"
+          enterKeyHint="done"
+          aria-label={label ? `${label} 예식 시간` : "예식 시간"}
+          className={inputCls}
+          placeholder="예: 1130"
+        />
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={add} className="h-11 shrink-0 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+          추가
+        </button>
+      </div>
+      {bad.length > 0 && <p className="mt-1.5 text-xs text-red-600">알아볼 수 없는 시간: {bad.join(", ")}</p>}
     </div>
   );
 }
