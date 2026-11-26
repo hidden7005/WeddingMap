@@ -19,6 +19,7 @@ import {
 import { formatDate, formatMinutes, formatTime, formatWon, isStale, venueTitle } from "@/lib/format";
 import type { VenuePin } from "@/lib/sites";
 import VenueNotes from "./VenueNotes";
+import { VenueDeleteRequest } from "./VenueRequest";
 
 type Editor = { editor: { nickname: string } | null };
 type Venue = Tables<"venues"> & Editor;
@@ -203,6 +204,7 @@ export default function VenueDetail({
             마지막 수정 {venue.editor.nickname} · {formatDate(venue.updated_at)}
           </p>
         )}
+        <VenueDeleteRequest venueId={venue.id} venueName={venueTitle(venue)} />
       </div>
     </div>
   );

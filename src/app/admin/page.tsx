@@ -808,7 +808,7 @@ function VenueRequests() {
   return (
     <section>
       <h2 className="font-bold">
-        식장 등록 요청 {pending.length > 0 && <span className="ml-1 rounded-full bg-rose-500 px-2 py-0.5 text-xs text-white">{pending.length}</span>}
+        식장 등록·삭제 요청 {pending.length > 0 && <span className="ml-1 rounded-full bg-rose-500 px-2 py-0.5 text-xs text-white">{pending.length}</span>}
       </h2>
       {!rows ? (
         <p className="mt-2 text-sm text-slate-400">불러오는 중…</p>
@@ -821,9 +821,22 @@ function VenueRequests() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold">
-                    {r.name}
+                    <span
+                      className={`mr-1.5 rounded px-1.5 py-0.5 text-[11px] font-semibold ${r.kind === "delete" ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-700"}`}
+                    >
+                      {r.kind === "delete" ? "삭제" : "등록"}
+                    </span>
+                    {r.kind === "delete" && r.venue_id ? (
+                      <Link href={`/?v=${r.venue_id}`} className="hover:underline">
+                        {r.name}
+                      </Link>
+                    ) : (
+                      r.name
+                    )}
                     {r.status !== "pending" && (
-                      <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-normal text-slate-600">{r.status === "done" ? "등록 완료" : "반려"}</span>
+                      <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-normal text-slate-600">
+                        {r.status === "done" ? (r.kind === "delete" ? "삭제 완료" : "등록 완료") : "반려"}
+                      </span>
                     )}
                   </p>
                   {r.location && <p className="text-slate-600 break-all">{r.location}</p>}
@@ -836,7 +849,7 @@ function VenueRequests() {
                   {r.status === "pending" ? (
                     <>
                       <button onClick={() => setStatus(r, "done")} className="rounded bg-slate-900 px-2 py-1 text-xs text-white">
-                        등록 완료
+                        {r.kind === "delete" ? "삭제 완료" : "등록 완료"}
                       </button>
                       <button onClick={() => setStatus(r, "rejected")} className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100">
                         반려
@@ -856,7 +869,7 @@ function VenueRequests() {
           ))}
         </ul>
       )}
-      <p className="mt-1.5 text-xs text-slate-400">지도에 실제로 추가하는 건 아직 Claude에게 요청해 주세요. ‘등록 완료’는 표시만 바꿔요.</p>
+      <p className="mt-1.5 text-xs text-slate-400">지도에 실제로 추가·삭제하는 건 아직 Claude에게 요청해 주세요. ‘완료’ 버튼은 표시만 바꿔요.</p>
     </section>
   );
 }

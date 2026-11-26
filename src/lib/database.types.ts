@@ -380,14 +380,18 @@ export type Database = {
           created_at: string
           handled_at: string | null
           id: string
+          kind: string
           location: string | null
           memo: string | null
           name: string
           requested_by: string | null
           status: string
+          venue_id: string | null
         }
         Insert: {
           name: string
+          kind?: string
+          venue_id?: string | null
           location?: string | null
           memo?: string | null
         }
@@ -395,6 +399,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "venue_requests_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "venue_requests_requested_by_fkey"
             columns: ["requested_by"]
