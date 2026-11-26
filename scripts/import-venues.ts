@@ -57,11 +57,8 @@ function toVenue(r: CsvRow, line: number) {
     bizNo ??
     "h:" + createHash("sha1").update(`${r.상호명.trim()}|${roadAddress}`).digest("hex").slice(0, 16);
 
-  const rooms = blank(r.객실수);
-
   return {
     source_key: sourceKey,
-    biz_no: bizNo,
     sido: r.시도.trim(),
     sigungu: r.시군구.trim(),
     name: r.상호명.trim(),
@@ -73,9 +70,6 @@ function toVenue(r: CsvRow, line: number) {
     lat,
     lng,
     category: toCategory(r.구분),
-    wedding_confirm: blank(r.예식확인),
-    hotel_grade: blank(r.호텔등급),
-    room_count: rooms ? Math.round(Number(rooms)) : null,
     phone: blank(r.전화번호),
     homepage: blank(r.홈페이지),
     registered_industry: blank(r.등록업종),

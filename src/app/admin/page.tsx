@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import type { Tables, Views } from "@/lib/database.types";
-import { formatPhone } from "@/lib/phone";
 import { isValidMemberCode, parseMemberLines } from "@/lib/members";
 import { formatDate, venueTitle } from "@/lib/format";
 import { thumbPath } from "@/lib/image";
@@ -387,13 +386,11 @@ function MembersTab({ members, myUserId, reload }: { members: Member[] | null; m
     const q = filter.replace(/\s/g, "").toLowerCase();
     const base = approved.filter((m) => !onlySuspicious || isSuspicious(m.stats));
     if (!q) return base;
-    const qPhone = q.replace(/\D/g, "");
     return base.filter(
       (m) =>
         m.name.replace(/\s/g, "").includes(q) ||
         m.member_code?.toLowerCase().includes(q) ||
-        m.email?.includes(q) ||
-        (qPhone.length >= 3 && formatPhone(m.phone).replace(/\D/g, "").includes(qPhone)),
+        m.email?.includes(q),
     );
   }, [approved, filter, onlySuspicious]);
   const suspiciousCount = useMemo(() => approved.filter((m) => isSuspicious(m.stats)).length, [approved]);
@@ -421,7 +418,7 @@ function MembersTab({ members, myUserId, reload }: { members: Member[] | null; m
   }
 
   async function remove(m: Member, what = "명단에서 삭제") {
-    if (!confirm(`${m.member_code ?? m.name} (${m.email ?? formatPhone(m.phone)}) 을(를) ${what}할까요?`)) return;
+    if (!confirm(`${m.member_code ?? m.name} (${m.email ?? "이메일 없음"}) 을(를) ${what}할까요?`)) return;
     const { error } = await supabase.from("members").delete().eq("id", m.id);
     if (error) return alert("삭제하지 못했어요: " + error.message);
     reload();
@@ -498,7 +495,6 @@ function MembersTab({ members, myUserId, reload }: { members: Member[] | null; m
                     </p>
                     <p className="break-all text-slate-500">
                       {m.email ?? <span className="text-amber-600">이메일 없음 — 로그인 불가</span>}
-                      {m.phone && <span className="ml-2 text-xs text-slate-400">{formatPhone(m.phone)}</span>}
                       {m.joined_at && <span className="ml-2 text-xs text-slate-400">가입 {formatDate(m.joined_at)}</span>}
                     </p>
                     {m.stats && (
@@ -596,7 +592,7 @@ function AddMembers({ existing, onAdded }: { existing: Member[]; onAdded: () => 
     const now = new Date().toISOString();
     const { error } = await supabase
       .from("members")
-      .insert(fresh.map((m) => ({ name: m.name, email: m.email, phone: m.phone, member_code: m.code, team: m.team, approved_at: now })));
+      .insert(fresh.map((m) => ({ name: m.name, email: m.email, member_code: m.code, team: m.team, approved_at: now })));
     setBusy(false);
     if (error) return setResult(error.code === "23505" ? "이미 등록된 이메일·아이디가 섞여 있어요. 확인 후 다시 시도해주세요." : "등록하지 못했어요: " + error.message);
     setResult(`${fresh.length}명을 승인 상태로 등록했어요. 이제 이 이메일로 로그인할 수 있어요.`);
@@ -841,8 +837,6 @@ function VenueRequests() {
                       </span>
                     )}
                   </p>
-                  {r.location && <p className="text-slate-600 break-all">{r.location}</p>}
-                  {r.memo && <p className="mt-0.5 whitespace-pre-line text-slate-500">{r.memo}</p>}
                   <p className="mt-0.5 text-xs text-slate-400">
                     {r.requester?.nickname ?? "탈퇴한 회원"} · {whenText(r.created_at)}
                   </p>

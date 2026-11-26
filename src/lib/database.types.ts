@@ -123,8 +123,6 @@ export type Database = {
           id: string
           interval_minutes: number | null
           name: string
-          photo_notes: string | null
-          schedule_note: string | null
           sort_order: number
           updated_at: string
           updated_by: string | null
@@ -138,8 +136,6 @@ export type Database = {
           id?: string
           interval_minutes?: number | null
           name: string
-          photo_notes?: string | null
-          schedule_note?: string | null
           sort_order?: number
           updated_at?: string
           updated_by?: string | null
@@ -153,8 +149,6 @@ export type Database = {
           id?: string
           interval_minutes?: number | null
           name?: string
-          photo_notes?: string | null
-          schedule_note?: string | null
           sort_order?: number
           updated_at?: string
           updated_by?: string | null
@@ -202,7 +196,6 @@ export type Database = {
           member_code: string | null
           name: string
           note: string | null
-          phone: string | null
           team: string | null
           role: string
           status: string
@@ -217,7 +210,6 @@ export type Database = {
           member_code?: string | null
           name: string
           note?: string | null
-          phone?: string | null
           team?: string | null
           role?: string
           status?: string
@@ -232,7 +224,6 @@ export type Database = {
           member_code?: string | null
           name?: string
           note?: string | null
-          phone?: string | null
           team?: string | null
           role?: string
           status?: string
@@ -384,8 +375,6 @@ export type Database = {
           handled_at: string | null
           id: string
           kind: string
-          location: string | null
-          memo: string | null
           name: string
           requested_by: string | null
           status: string
@@ -395,8 +384,6 @@ export type Database = {
           name: string
           kind?: string
           venue_id?: string | null
-          location?: string | null
-          memo?: string | null
         }
         Update: {
           status?: string
@@ -420,142 +407,91 @@ export type Database = {
       }
       venues: {
         Row: {
-          biz_no: string | null
           branch_name: string | null
-          bridal_room_info: string | null
           building_name: string | null
           category: string
           created_at: string
           created_by: string | null
-          equipment_route: string | null
-          external_snap_policy: string | null
-          external_vendor_fee: number | null
-          flash_policy: string | null
           floor: string | null
           former_names: string | null
-          guest_free_methods: string[] | null
           guest_free_minutes: number | null
           homepage: string | null
-          hotel_grade: string | null
           id: string
           jibun_address: string | null
           lat: number
           lng: number
           name: string
-          official_photo_timing: string | null
-          official_vendor_designated: boolean | null
-          official_vendor_name: string | null
           overtime_fee: number | null
           overtime_unit_minutes: number | null
-          parking_capacity: string | null
           parking_checked_at: string | null
           parking_notes: string | null
-          pass_required: boolean | null
           phone: string | null
-          photo_checked_at: string | null
-          photo_notes: string | null
           registered_industry: string | null
           road_address: string
-          room_count: number | null
           sido: string
           sigungu: string
           source: string
           source_key: string
           updated_at: string
           updated_by: string | null
-          wedding_confirm: string | null
         }
         Insert: {
-          biz_no?: string | null
           branch_name?: string | null
-          bridal_room_info?: string | null
           building_name?: string | null
           category: string
           created_at?: string
           created_by?: string | null
-          equipment_route?: string | null
-          external_snap_policy?: string | null
-          external_vendor_fee?: number | null
-          flash_policy?: string | null
           floor?: string | null
           former_names?: string | null
-          guest_free_methods?: string[] | null
           guest_free_minutes?: number | null
           homepage?: string | null
-          hotel_grade?: string | null
           id?: string
           jibun_address?: string | null
           lat: number
           lng: number
           name: string
-          official_photo_timing?: string | null
-          official_vendor_designated?: boolean | null
-          official_vendor_name?: string | null
           overtime_fee?: number | null
           overtime_unit_minutes?: number | null
-          parking_capacity?: string | null
           parking_checked_at?: string | null
           parking_notes?: string | null
-          pass_required?: boolean | null
           phone?: string | null
-          photo_checked_at?: string | null
-          photo_notes?: string | null
           registered_industry?: string | null
           road_address: string
-          room_count?: number | null
           sido: string
           sigungu: string
           source?: string
           source_key: string
           updated_at?: string
           updated_by?: string | null
-          wedding_confirm?: string | null
         }
         Update: {
-          biz_no?: string | null
           branch_name?: string | null
-          bridal_room_info?: string | null
           building_name?: string | null
           category?: string
           created_at?: string
           created_by?: string | null
-          equipment_route?: string | null
-          external_snap_policy?: string | null
-          external_vendor_fee?: number | null
-          flash_policy?: string | null
           floor?: string | null
           former_names?: string | null
-          guest_free_methods?: string[] | null
           guest_free_minutes?: number | null
           homepage?: string | null
-          hotel_grade?: string | null
           id?: string
           jibun_address?: string | null
           lat?: number
           lng?: number
           name?: string
-          official_photo_timing?: string | null
-          official_vendor_designated?: boolean | null
-          official_vendor_name?: string | null
           overtime_fee?: number | null
           overtime_unit_minutes?: number | null
-          parking_capacity?: string | null
           parking_checked_at?: string | null
           parking_notes?: string | null
-          pass_required?: boolean | null
           phone?: string | null
-          photo_checked_at?: string | null
-          photo_notes?: string | null
           registered_industry?: string | null
           road_address?: string
-          room_count?: number | null
           sido?: string
           sigungu?: string
           source?: string
           source_key?: string
           updated_at?: string
           updated_by?: string | null
-          wedding_confirm?: string | null
         }
         Relationships: [
           {
@@ -627,7 +563,6 @@ export type Database = {
           lat: number | null
           lng: number | null
           name: string | null
-          official_vendor_designated: boolean | null
           road_address: string | null
           same_address_count: number | null
           sido: string | null

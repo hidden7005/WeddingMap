@@ -401,9 +401,8 @@ function ParkingTab({
   const [editing, setEditing] = useState(false);
   const hasInfo =
     venue.guest_free_minutes != null ||
-    venue.parking_capacity != null ||
-    (venue.guest_free_methods?.length ?? 0) > 0 ||
-    venue.overtime_fee != null;
+    venue.overtime_fee != null ||
+    !!venue.parking_notes;
 
   const overtime =
     venue.overtime_fee != null
@@ -641,11 +640,6 @@ function HallsTab({
                         + 시간 입력
                       </button>
                     )}
-                  </p>
-                )}
-                {h.photo_notes && (
-                  <p className="mt-2 rounded-lg bg-slate-50 p-2 text-sm whitespace-pre-line text-slate-700">
-                    📷 {h.photo_notes}
                   </p>
                 )}
               </>
