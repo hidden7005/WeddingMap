@@ -29,7 +29,7 @@ export function SearchInput({
         onChange={(e) => onChange(e.target.value)}
         onFocus={onFocus}
         placeholder="예식장 검색"
-        className="h-12 w-full rounded-xl border border-slate-200 bg-white pr-10 pl-10 text-[15px] shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-400 [&::-webkit-search-cancel-button]:hidden"
+        className="h-11 w-full rounded-xl border border-slate-200 bg-white pr-10 pl-10 text-[15px] shadow-sm outline-none placeholder:text-slate-400 focus:border-slate-400 [&::-webkit-search-cancel-button]:hidden"
         aria-label="예식장 검색"
       />
       {value && (

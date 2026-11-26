@@ -194,10 +194,12 @@ export default function MapApp() {
         <aside className="flex w-[400px] shrink-0 flex-col border-r border-slate-200 bg-white">
           <div className="border-b border-slate-100 p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h1 className="flex items-center gap-2.5">
-                <Logo variant="wordmark" className="h-4" />
-                <span className="h-5 w-px bg-slate-300" aria-hidden />
-                <span className="text-sm font-semibold text-slate-600">{APP_NAME}</span>
+              <h1>
+                <button onClick={refreshHome} aria-label="언아더데이 맵 처음 화면으로" className="flex items-center gap-2.5">
+                  <Logo variant="wordmark" className="h-4" />
+                  <span className="h-5 w-px bg-slate-300" aria-hidden />
+                  <span className="text-sm font-semibold text-slate-600">{APP_NAME}</span>
+                </button>
               </h1>
               <UserMenu />
             </div>
@@ -237,6 +239,15 @@ export default function MapApp() {
 
       <div className="absolute inset-x-0 top-0 z-20 p-3" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <div className="flex gap-2">
+          {/* 언아더데이 로고: 누르면 처음 화면으로 새로고침 */}
+          <button
+            onClick={refreshHome}
+            aria-label="언아더데이 맵 처음 화면으로"
+            className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-a.png" alt="ANOTHERDAY" className="h-8 w-8" draggable={false} />
+          </button>
           <SearchInput className="min-w-0 flex-1" value={query} onChange={(v) => (setQuery(v), setSearchOpen(true))} onFocus={() => setSearchOpen(true)} />
           <UserMenu compact />
         </div>
@@ -314,4 +325,9 @@ function VersionBadge({ className = "" }: { className?: string }) {
       v{APP_VERSION}
     </span>
   );
+}
+
+/** 로고를 누르면 처음 화면으로 새로고침 (선택한 예식장·검색어 초기화) */
+function refreshHome() {
+  window.location.assign("/");
 }
