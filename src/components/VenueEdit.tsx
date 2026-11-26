@@ -106,8 +106,8 @@ export function HallEditor({
 }: {
   venueId: string;
   hall?: Hall;
-  /** 지금 '공통' 시간표 ("HH:MM:SS") */
-  times: string[];
+  /** 지금 시간표 ("HH:MM:SS"): 공통 / 토 / 일 */
+  times: { common: string[]; sat: string[]; sun: string[] };
   nextSort: number;
   onDone: () => void;
   onCancel: () => void;
@@ -118,19 +118,26 @@ export function HallEditor({
   const [hallType, setHallType] = useState<string | null>(
     hall?.hall_type ?? null,
   );
-  const [timesText, setTimesText] = useState(
-    initialTimes.map(formatTime).join(" "),
-  );
+  const fmt = (l: string[]) => l.map(formatTime).join(" ");
+  // 토·일 시간이 다르면 따로 입력
+  const [split, setSplit] = useState(initialTimes.sat.length > 0 || initialTimes.sun.length > 0);
+  const [timesText, setTimesText] = useState(fmt(initialTimes.common));
+  const [satText, setSatText] = useState(fmt(initialTimes.sat));
+  const [sunText, setSunText] = useState(fmt(initialTimes.sun));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const parsed = parseTimes(timesText);
+  const parsedSat = parseTimes(satText);
+  const parsedSun = parseTimes(sunText);
+  const invalid = split ? [...parsedSat.invalid, ...parsedSun.invalid] : parsed.invalid;
+  const hasTimes = split ? parsedSat.times.length + parsedSun.times.length > 0 : parsed.times.length > 0;
   const createdHallId = useRef<string | undefined>(undefined);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (parsed.invalid.length)
-      return setError(`알아볼 수 없는 시간: ${parsed.invalid.join(", ")}`);
+    if (invalid.length)
+      return setError(`알아볼 수 없는 시간: ${invalid.join(", ")}`);
     setBusy(true);
     setError(null);
     const row = {
@@ -139,7 +146,7 @@ export function HallEditor({
       hall_type: hallType,
       is_outdoor: outdoor,
       // 시작 시간을 적으면 예전 '예식 간격' 값은 필요 없으므로 비움 (시간이 없으면 그대로 둠)
-      ...(parsed.times.length ? { interval_minutes: null } : {}),
+      ...(hasTimes ? { interval_minutes: null } : {}),
     };
     // 새 홀을 만든 뒤 시간 저장에서 실패했다면, 다시 저장할 때는 만든 홀을 고침 (중복 생성 방지)
     let hallId = hall?.id ?? createdHallId.current;
@@ -159,31 +166,30 @@ export function HallEditor({
       hallId = data.id;
       createdHallId.current = data.id;
     }
-    // 시간표: 바뀐 것만 지우고 추가 (그대로인 시간은 기록을 남기지 않음)
-    const before = new Set(initialTimes.map(formatTime));
-    const after = new Set(parsed.times);
-    const removed = [...before].filter((t) => !after.has(t));
-    const added = [...after].filter((t) => !before.has(t));
-    if (hall && removed.length) {
+    // 시간표: 요일별로 바뀐 것만 지우고 추가 (그대로인 시간은 기록을 남기지 않음)
+    const want: Record<"common" | "sat" | "sun", string[]> = split
+      ? { common: [], sat: parsedSat.times, sun: parsedSun.times }
+      : { common: parsed.times, sat: [], sun: [] };
+    const days = ["common", "sat", "sun"] as const;
+    const plan = days.map((d) => {
+      const before = new Set(initialTimes[d].map(formatTime));
+      const after = new Set(want[d]);
+      return { d, removed: [...before].filter((t) => !after.has(t)), added: [...after].filter((t) => !before.has(t)) };
+    });
+    // 지우기를 먼저 (같은 시간을 공통 → 토요일로 옮길 때 충돌 방지)
+    for (const { d, removed } of plan) {
+      if (!hall || !removed.length) continue;
       const { error } = await supabase
         .from("hall_schedules")
         .delete()
         .eq("hall_id", hallId)
-        .eq("day_type", "common")
-        .in(
-          "start_time",
-          removed.map((t) => `${t}:00`),
-        );
+        .eq("day_type", d)
+        .in("start_time", removed.map((t) => `${t}:00`));
       if (error) return (setBusy(false), setError(friendly(error)));
     }
-    if (added.length) {
-      const { error } = await supabase.from("hall_schedules").insert(
-        added.map((t) => ({
-          hall_id: hallId!,
-          start_time: t,
-          day_type: "common",
-        })),
-      );
+    const rows = plan.flatMap(({ d, added }) => added.map((t) => ({ hall_id: hallId!, start_time: t, day_type: d })));
+    if (rows.length) {
+      const { error } = await supabase.from("hall_schedules").insert(rows);
       if (error) return (setBusy(false), setError(friendly(error)));
     }
     setBusy(false);
@@ -257,29 +263,31 @@ export function HallEditor({
         label="예식 시간"
         hint="띄어쓰기로 구분해서 입력 (예: 11:00 12:30 14:00 15:30 17:00)"
       >
-        <input
-          value={timesText}
-          onChange={(e) => setTimesText(e.target.value)}
-          inputMode="text"
-          className={inputCls}
-          placeholder="11:00 15:00 18:00"
-        />
-        {parsed.times.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {parsed.times.map((t) => (
-              <span
-                key={t}
-                className="rounded-lg bg-white px-2 py-1 text-sm font-semibold text-slate-800 ring-1 ring-slate-200"
-              >
-                {t}
-              </span>
-            ))}
+        <div className="mb-2 flex gap-1.5">
+          <Chip on={!split} onClick={() => setSplit(false)}>
+            토·일 같음
+          </Chip>
+          <Chip
+            on={split}
+            onClick={() => {
+              // 처음 나눌 때는 지금 시간을 토·일 둘 다에 채워 둠
+              if (!split && !satText && !sunText) {
+                setSatText(timesText);
+                setSunText(timesText);
+              }
+              setSplit(true);
+            }}
+          >
+            토·일 다름
+          </Chip>
+        </div>
+        {split ? (
+          <div className="space-y-3">
+            <TimesInput label="토요일" value={satText} onChange={setSatText} parsed={parsedSat} />
+            <TimesInput label="일요일" value={sunText} onChange={setSunText} parsed={parsedSun} />
           </div>
-        )}
-        {parsed.invalid.length > 0 && (
-          <p className="mt-1.5 text-xs text-red-600">
-            알아볼 수 없는 시간: {parsed.invalid.join(", ")}
-          </p>
+        ) : (
+          <TimesInput value={timesText} onChange={setTimesText} parsed={parsed} />
         )}
       </Field>
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -299,6 +307,35 @@ export function HallEditor({
         }
       />
     </form>
+  );
+}
+
+function TimesInput({
+  label,
+  value,
+  onChange,
+  parsed,
+}: {
+  label?: string;
+  value: string;
+  onChange: (v: string) => void;
+  parsed: ReturnType<typeof parseTimes>;
+}) {
+  return (
+    <div>
+      {label && <p className="mb-1 text-xs font-semibold text-slate-500">{label}</p>}
+      <input value={value} onChange={(e) => onChange(e.target.value)} inputMode="text" aria-label={label ? `${label} 예식 시간` : "예식 시간"} className={inputCls} placeholder="11:00 15:00 18:00" />
+      {parsed.times.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {parsed.times.map((t) => (
+            <span key={t} className="rounded-lg bg-white px-2 py-1 text-sm font-semibold text-slate-800 ring-1 ring-slate-200">
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+      {parsed.invalid.length > 0 && <p className="mt-1.5 text-xs text-red-600">알아볼 수 없는 시간: {parsed.invalid.join(", ")}</p>}
+    </div>
   );
 }
 

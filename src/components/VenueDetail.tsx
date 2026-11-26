@@ -554,16 +554,15 @@ function HallsTab({
     setEditing(null);
     onSaved();
   };
-  const commonTimes = (hallId: string) =>
-    schedules
-      .filter((s) => s.hall_id === hallId && s.day_type === "common")
-      .map((s) => s.start_time!);
+  const timesOf = (hallId: string, day: string) =>
+    schedules.filter((s) => s.hall_id === hallId && s.day_type === day).map((s) => s.start_time!);
+  const hallTimes = (hallId: string) => ({ common: timesOf(hallId, "common"), sat: timesOf(hallId, "sat"), sun: timesOf(hallId, "sun") });
   const addHall = canEdit && (
     <div className="mt-2">
       {editing === "new" ? (
         <HallEditor
           venueId={venueId}
-          times={[]}
+          times={{ common: [], sat: [], sun: [] }}
           nextSort={halls.length + 1}
           onCancel={() => setEditing(null)}
           onDone={done}
@@ -606,7 +605,7 @@ function HallsTab({
               <HallEditor
                 venueId={venueId}
                 hall={h}
-                times={commonTimes(h.id)}
+                times={hallTimes(h.id)}
                 nextSort={halls.length + 1}
                 onCancel={() => setEditing(null)}
                 onDone={done}
