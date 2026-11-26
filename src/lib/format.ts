@@ -34,7 +34,11 @@ export function isStale(iso: string | null | undefined, now = new Date()): boole
 }
 
 export function venueTitle(v: { name: string | null; branch_name: string | null }) {
-  return [v.name, v.branch_name].filter(Boolean).join(" ");
+  const name = v.name ?? "";
+  const branch = v.branch_name?.trim();
+  // 이름에 이미 지점 이름이 들어 있으면 (아펠가모 반포 + 반포점) 지점명은 붙이지 않음
+  if (!branch || name.includes(branch.replace(/점$/, ""))) return name;
+  return `${name} ${branch}`;
 }
 
 /** 초과 요금 표시: 10분당 1,000원 / 1시간당 6,000원 / 0원이면 '없음' */
