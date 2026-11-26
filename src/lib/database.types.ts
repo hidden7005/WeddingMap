@@ -425,7 +425,6 @@ export type Database = {
           overtime_unit_minutes: number | null
           parking_checked_at: string | null
           parking_notes: string | null
-          phone: string | null
           registered_industry: string | null
           road_address: string
           sido: string
@@ -454,7 +453,6 @@ export type Database = {
           overtime_unit_minutes?: number | null
           parking_checked_at?: string | null
           parking_notes?: string | null
-          phone?: string | null
           registered_industry?: string | null
           road_address: string
           sido: string
@@ -483,7 +481,6 @@ export type Database = {
           overtime_unit_minutes?: number | null
           parking_checked_at?: string | null
           parking_notes?: string | null
-          phone?: string | null
           registered_industry?: string | null
           road_address?: string
           sido?: string

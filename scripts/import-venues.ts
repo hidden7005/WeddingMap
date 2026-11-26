@@ -70,7 +70,6 @@ function toVenue(r: CsvRow, line: number) {
     lat,
     lng,
     category: toCategory(r.구분),
-    phone: blank(r.전화번호),
     homepage: blank(r.홈페이지),
     registered_industry: blank(r.등록업종),
     former_names: blank(r.통합전_상호),

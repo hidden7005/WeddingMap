@@ -24,7 +24,6 @@ import VenueNotes from "./VenueNotes";
 import { VenueDeleteRequest } from "./VenueRequest";
 import { HallEditor, ParkingEditor } from "./VenueEdit";
 import { useAuth } from "./AuthProvider";
-import { formatTel } from "@/lib/phone";
 
 type Editor = { editor: { nickname: string } | null };
 type Venue = Tables<"venues"> & Editor;
@@ -203,17 +202,6 @@ export default function VenueDetail({
           </button>
         </div>
         <div className="mt-2.5 space-y-0.5 text-sm">
-          {venue.phone && (
-            <p>
-              <span className="inline-block w-14 text-slate-500">phone.</span>
-              <a
-                href={`tel:${venue.phone.replace(/[^\d+]/g, "")}`}
-                className="text-slate-600 underline-offset-2 hover:underline"
-              >
-                {formatTel(venue.phone)}
-              </a>
-            </p>
-          )}
           {venue.homepage && (
             <a
               href={
