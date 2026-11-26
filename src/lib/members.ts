@@ -16,15 +16,30 @@ export function normalizeEmail(input: string): string {
 const EMAIL_IN_LINE = /[^\s,;<>()"']+@[^\s,;<>()"']+\.[^\s,;<>()"']+/;
 const PHONE_IN_LINE = /(\+?82[\s-]?|0)1[016789][\s-]?\d{3,4}[\s-]?\d{4}/;
 
+/** 아이디 형식: 2~30자, 공백 없음 (예: AD_홍길동) */
+export function isValidMemberCode(code: string): boolean {
+  const c = code.trim();
+  return c.length >= 2 && c.length <= 30 && !/\s/.test(c);
+}
+
+/** 아이디의 밑줄 뒤를 이름으로: AD_홍길동 → 홍길동 */
+export function nameFromCode(code: string): string {
+  const i = code.indexOf("_");
+  return (i >= 0 ? code.slice(i + 1) : code).trim() || code.trim();
+}
+
+export type ParsedMember = { name: string; email: string; phone: string | null; code: string | null };
+
 /**
- * 관리자 일괄 등록: 한 줄에 "이름, 이메일" (휴대폰 번호는 있으면 함께 저장, 순서 무관)
- * 엑셀에서 열을 복사해 붙여넣어도 됨 (쉼표·탭·공백 구분)
+ * 관리자 일괄 등록: 한 줄에 "아이디, 이메일" 또는 "이름, 이메일" (휴대폰 번호는 있으면 함께, 순서 무관)
+ *   - 밑줄(_)이 들어간 칸은 아이디로 보고, 이름은 밑줄 뒤 (AD_홍길동 → 홍길동)
+ *   - 엑셀에서 열을 복사해 붙여넣어도 됨 (쉼표·탭·공백 구분)
  */
 export function parseMemberLines(text: string): {
-  members: { name: string; email: string; phone: string | null }[];
+  members: ParsedMember[];
   errors: string[];
 } {
-  const members: { name: string; email: string; phone: string | null }[] = [];
+  const members: ParsedMember[] = [];
   const errors: string[] = [];
   const seen = new Set<string>();
   text
@@ -48,7 +63,10 @@ export function parseMemberLines(text: string): {
       const phoneMatch = rest.match(PHONE_IN_LINE);
       const phone = phoneMatch ? normalizePhone(phoneMatch[0]) : null;
       if (phoneMatch) rest = rest.replace(phoneMatch[0], " ");
-      const name = rest.replace(/[,\t;]/g, " ").replace(/\s+/g, " ").trim();
+      const tokens = rest.replace(/[,\t;]/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+      const codeToken = tokens.find((t) => t.includes("_") && isValidMemberCode(t)) ?? null;
+      const others = tokens.filter((t) => t !== codeToken).join(" ");
+      const name = others || (codeToken ? nameFromCode(codeToken) : "");
       if (!name) {
         errors.push(`${i + 1}번째 줄: 이름이 없어요 — "${line}"`);
         return;
@@ -58,7 +76,7 @@ export function parseMemberLines(text: string): {
         return;
       }
       seen.add(email);
-      members.push({ name, email, phone });
+      members.push({ name, email, phone, code: codeToken });
     });
   return { members, errors };
 }

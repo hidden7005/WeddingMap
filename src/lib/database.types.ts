@@ -193,6 +193,7 @@ export type Database = {
           email: string | null
           id: string
           joined_at: string | null
+          member_code: string | null
           name: string
           note: string | null
           phone: string | null
@@ -207,6 +208,7 @@ export type Database = {
           email?: string | null
           id?: string
           joined_at?: string | null
+          member_code?: string | null
           name: string
           note?: string | null
           phone?: string | null
@@ -221,6 +223,7 @@ export type Database = {
           email?: string | null
           id?: string
           joined_at?: string | null
+          member_code?: string | null
           name?: string
           note?: string | null
           phone?: string | null
@@ -234,16 +237,19 @@ export type Database = {
       app_settings: {
         Row: {
           id: boolean
+          require_login_from: string | null
           require_login_to_view: boolean
           updated_at: string
         }
         Insert: {
           id?: boolean
+          require_login_from?: string | null
           require_login_to_view?: boolean
           updated_at?: string
         }
         Update: {
           id?: boolean
+          require_login_from?: string | null
           require_login_to_view?: boolean
           updated_at?: string
         }
@@ -587,7 +593,9 @@ export type Database = {
     }
     Functions: {
       _edit_ignored_columns: { Args: never; Returns: string[] }
+      admin_stats: { Args: never; Returns: Json }
       can_view: { Args: never; Returns: boolean }
+      record_visit: { Args: { p_visitor: string }; Returns: undefined }
       email_login_status: { Args: { p_email: string }; Returns: string }
       request_access: { Args: { p_name: string; p_email: string; p_phone?: string; p_note?: string }; Returns: string }
       claim_session: { Args: { p_device?: string; p_user_agent?: string }; Returns: string }

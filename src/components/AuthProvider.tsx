@@ -15,6 +15,8 @@ type AuthState = {
   member: MemberInfo | null;
   /** 관리자 설정: 로그인한 회원만 보기 */
   requireLogin: boolean | null;
+  /** 관리자 설정 원본: 스위치 / 로그인 필수 시작 시각 */
+  settings: { requireLoginToView: boolean; requireLoginFrom: string | null } | null;
   /** 자동 로그아웃 등 사용자에게 알릴 메시지 */
   notice: string | null;
   clearNotice: () => void;
@@ -68,7 +70,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthState["status"]>("loading");
   const [member, setMember] = useState<MemberInfo | null>(null);
-  const [requireLogin, setRequireLogin] = useState<boolean | null>(null);
+  const [settings, setSettings] = useState<AuthState["settings"]>(null);
+  const [clock, setClock] = useState(() => Date.now());
+  // 시작일이 지나는 순간 바로 반영되도록 1분마다 갱신
+  useEffect(() => {
+    const t = setInterval(() => setClock(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  const requireLogin =
+    settings === null
+      ? null
+      : settings.requireLoginToView || (!!settings.requireLoginFrom && clock >= new Date(settings.requireLoginFrom).getTime());
   const [notice, setNotice] = useState<string | null>(null);
   const [kakaoLinked, setKakaoLinked] = useState(false);
   const checking = useRef(false);
@@ -131,8 +143,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [claim, signOut]);
 
   const loadSettings = useCallback(async () => {
-    const { data } = await supabase.from("app_settings").select("require_login_to_view").single();
-    setRequireLogin(data?.require_login_to_view ?? false);
+    const { data, error } = await supabase.from("app_settings").select("require_login_to_view, require_login_from").single();
+    if (error) {
+      // 시작일 컬럼이 아직 없는 DB(0010 적용 전)에서도 동작
+      const { data: d2 } = await supabase.from("app_settings").select("require_login_to_view").single();
+      return setSettings({ requireLoginToView: d2?.require_login_to_view ?? false, requireLoginFrom: null });
+    }
+    setSettings({ requireLoginToView: data?.require_login_to_view ?? false, requireLoginFrom: data?.require_login_from ?? null });
   }, []);
 
   useEffect(() => {
@@ -154,6 +171,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [check, loadSettings]);
 
+  useEffect(() => {
+    if (status === "loading" || member?.role === "admin") return;
+    try {
+      const day = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+      if (localStorage.getItem("wm-visit-day") === day) return;
+      let id = localStorage.getItem("wm-visitor");
+      if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem("wm-visitor", id);
+      }
+      supabase.rpc("record_visit", { p_visitor: id }).then(({ error }) => {
+        if (!error) localStorage.setItem("wm-visit-day", day);
+      });
+    } catch {
+      /* 저장소를 못 쓰는 브라우저는 집계 생략 */
+    }
+  }, [status, member?.role]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -161,6 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         member,
         requireLogin,
+        settings,
         notice,
         clearNotice: () => setNotice(null),
         claim,
