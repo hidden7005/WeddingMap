@@ -20,11 +20,11 @@
   --radius-2xl: 0.625rem;
   --radius-3xl: 0.875rem;
 
-  /* 지도 핀: 웨딩홀 = 검정, 호텔 = 샴페인 토프, 기타 = 회색 */
-  --color-brand: #1f1f1f;
-  --color-brand-soft: #f2f2f2;
-  --color-hotel: #9a8260;
-  --color-hotel-soft: #f5f1ea;
+  /* 지도 핀: 웨딩홀 = 샌드 베이지, 호텔 = 딥 토프(베이지와 어울리게 한 톤 진하게), 기타 = 회색 */
+  --color-brand: #c8ad84;
+  --color-brand-soft: #f7f1e8;
+  --color-hotel: #7d6547;
+  --color-hotel-soft: #f3eee7;
   --color-etc: #a8a8a8;
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
     "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
