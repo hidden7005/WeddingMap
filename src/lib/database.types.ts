@@ -123,6 +123,7 @@ export type Database = {
           id: string
           name: string
           photo_notes: string | null
+          schedule_note: string | null
           sort_order: number
           updated_at: string
           updated_by: string | null
@@ -136,6 +137,7 @@ export type Database = {
           id?: string
           name: string
           photo_notes?: string | null
+          schedule_note?: string | null
           sort_order?: number
           updated_at?: string
           updated_by?: string | null
@@ -149,6 +151,7 @@ export type Database = {
           id?: string
           name?: string
           photo_notes?: string | null
+          schedule_note?: string | null
           sort_order?: number
           updated_at?: string
           updated_by?: string | null

@@ -315,6 +315,12 @@ function ParkingTab({ venue, parking }: { venue: Venue; parking: Parking[] }) {
 
 /* ───────────────────────── 홀·시간 ───────────────────────── */
 
+/** "2" → "2층", "B1" → "B1층", "MAIN TOWER 2층" 처럼 글이면 그대로 */
+function floorLabel(f: string | null) {
+  if (!f) return null;
+  return /^B?\d+$/.test(f.trim()) ? `${f.trim()}층` : f;
+}
+
 function HallsTab({ halls, schedules }: { halls: Hall[]; schedules: Schedule[] }) {
   if (!halls.length) return <Empty>아직 등록된 홀이 없어요</Empty>;
   const anySimultaneous = schedules.some((s) => s.is_simultaneous);
@@ -330,7 +336,7 @@ function HallsTab({ halls, schedules }: { halls: Hall[]; schedules: Schedule[] }
         return (
           <Section key={h.id} title={h.name} checkedAt={h.checked_at} checkedBy={h.editor?.nickname}>
             <p className="text-sm text-slate-500">
-              {[h.floor && `${h.floor}층`, label(HALL_TYPE, h.hall_type)].filter(Boolean).join(" · ") || "층·형태 미입력"}
+              {[floorLabel(h.floor), label(HALL_TYPE, h.hall_type)].filter(Boolean).join(" · ") || "층·형태 미입력"}
             </p>
             {byDay.length ? (
               <div className="mt-2 space-y-2">
@@ -355,8 +361,9 @@ function HallsTab({ halls, schedules }: { halls: Hall[]; schedules: Schedule[] }
                 ))}
               </div>
             ) : (
-              <p className="mt-2 text-sm text-slate-300">시간표 미입력</p>
+              !h.schedule_note && <p className="mt-2 text-sm text-slate-300">시간표 미입력</p>
             )}
+            {h.schedule_note && <p className="mt-2 text-xs leading-relaxed whitespace-pre-line text-slate-500">🕐 {h.schedule_note}</p>}
             {h.photo_notes && <p className="mt-2 rounded-lg bg-slate-50 p-2 text-sm whitespace-pre-line text-slate-700">📷 {h.photo_notes}</p>}
           </Section>
         );
