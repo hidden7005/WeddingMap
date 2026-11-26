@@ -16,10 +16,19 @@ import {
   isHotel,
   label,
 } from "@/lib/labels";
-import { formatDate, formatMinutes, formatTime, formatWon, isStale, venueTitle } from "@/lib/format";
+import {
+  formatDate,
+  formatMinutes,
+  formatTime,
+  formatWon,
+  isStale,
+  venueTitle,
+} from "@/lib/format";
 import type { VenuePin } from "@/lib/sites";
 import VenueNotes from "./VenueNotes";
 import { VenueDeleteRequest } from "./VenueRequest";
+import { HallEditor, ParkingEditor } from "./VenueEdit";
+import { useAuth } from "./AuthProvider";
 
 type Editor = { editor: { nickname: string } | null };
 type Venue = Tables<"venues"> & Editor;
@@ -27,7 +36,12 @@ type Hall = Tables<"halls"> & Editor;
 type Parking = Tables<"nearby_parking"> & Editor;
 type Schedule = Views<"hall_schedules_computed">;
 
-type Detail = { venue: Venue; halls: Hall[]; schedules: Schedule[]; parking: Parking[] };
+type Detail = {
+  venue: Venue;
+  halls: Hall[];
+  schedules: Schedule[];
+  parking: Parking[];
+};
 
 const TABS = [
   { key: "parking", label: "주차" },
@@ -38,14 +52,22 @@ type TabKey = (typeof TABS)[number]["key"];
 
 async function fetchDetail(id: string): Promise<Detail> {
   const [v, h, s, p] = await Promise.all([
-    supabase.from("venues").select("*, editor:profiles!venues_updated_by_fkey(nickname)").eq("id", id).single(),
+    supabase
+      .from("venues")
+      .select("*, editor:profiles!venues_updated_by_fkey(nickname)")
+      .eq("id", id)
+      .single(),
     supabase
       .from("halls")
       .select("*, editor:profiles!halls_updated_by_fkey(nickname)")
       .eq("venue_id", id)
       .order("sort_order")
       .order("name"),
-    supabase.from("hall_schedules_computed").select("*").eq("venue_id", id).order("start_time"),
+    supabase
+      .from("hall_schedules_computed")
+      .select("*")
+      .eq("venue_id", id)
+      .order("start_time"),
     supabase
       .from("nearby_parking")
       .select("*, editor:profiles!nearby_parking_updated_by_fkey(nickname)")
@@ -54,7 +76,12 @@ async function fetchDetail(id: string): Promise<Detail> {
   ]);
   const err = v.error ?? h.error ?? s.error ?? p.error;
   if (err) throw err;
-  return { venue: v.data as Venue, halls: (h.data ?? []) as Hall[], schedules: s.data ?? [], parking: (p.data ?? []) as Parking[] };
+  return {
+    venue: v.data as Venue,
+    halls: (h.data ?? []) as Hall[],
+    schedules: s.data ?? [],
+    parking: (p.data ?? []) as Parking[],
+  };
 }
 
 export default function VenueDetail({
@@ -73,6 +100,13 @@ export default function VenueDetail({
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>("parking");
   const [reload, setReload] = useState(0);
+  const auth = useAuth();
+  const canEdit = auth.status === "member";
+  // 저장 후 다시 불러오기 (화면 깜빡임 없이)
+  const refresh = () =>
+    fetchDetail(venueId)
+      .then(setDetail)
+      .catch(() => {});
 
   useEffect(() => {
     let cancelled = false;
@@ -91,7 +125,10 @@ export default function VenueDetail({
       <div className="p-5 text-sm">
         <p className="text-slate-700">정보를 불러오지 못했어요.</p>
         <p className="mt-1 text-xs text-slate-400">{error}</p>
-        <button onClick={() => setReload((r) => r + 1)} className="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-white">
+        <button
+          onClick={() => setReload((r) => r + 1)}
+          className="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-white"
+        >
           다시 시도
         </button>
       </div>
@@ -118,22 +155,47 @@ export default function VenueDetail({
           <div className="min-w-0">
             {/* 홈페이지 소제목처럼 넓은 자간의 영문 분류 */}
             <p className="wm-eyebrow flex flex-wrap items-center gap-x-2">
-              <span style={{ color: isHotel(venue.category) ? "var(--color-hotel)" : undefined }}>
-                {isHotel(venue.category) ? "Hotel" : venue.category === "auxiliary" ? "Etc" : "Wedding Hall"}
+              <span
+                style={{
+                  color: isHotel(venue.category)
+                    ? "var(--color-hotel)"
+                    : undefined,
+                }}
+              >
+                {isHotel(venue.category)
+                  ? "Hotel"
+                  : venue.category === "auxiliary"
+                    ? "Etc"
+                    : "Wedding Hall"}
               </span>
               <span className="tracking-normal normal-case">
                 {label(CATEGORY, venue.category)}
-                {venue.category === "auxiliary" && venue.registered_industry ? ` · ${venue.registered_industry}` : ""}
+                {venue.category === "auxiliary" && venue.registered_industry
+                  ? ` · ${venue.registered_industry}`
+                  : ""}
               </span>
             </p>
-            <h2 className="mt-1.5 text-[20px] leading-snug font-bold tracking-[-0.02em] text-slate-900">{venueTitle(venue)}</h2>
+            <h2 className="mt-1.5 text-[20px] leading-snug font-bold tracking-[-0.02em] text-slate-900">
+              {venueTitle(venue)}
+            </h2>
             <p className="mt-0.5 text-sm text-slate-600">
               {venue.road_address}
               {venue.floor ? ` ${venue.floor}층` : ""}
             </p>
           </div>
-          <button onClick={onClose} aria-label="닫기" className="-mr-2 shrink-0 rounded-full p-2 text-slate-400 hover:bg-slate-100">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <button
+            onClick={onClose}
+            aria-label="닫기"
+            className="-mr-2 shrink-0 rounded-full p-2 text-slate-400 hover:bg-slate-100"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
@@ -142,14 +204,21 @@ export default function VenueDetail({
           {venue.phone && (
             <p>
               <span className="inline-block w-14 text-slate-500">phone.</span>
-              <a href={`tel:${venue.phone}`} className="text-slate-600 underline-offset-2 hover:underline">
+              <a
+                href={`tel:${venue.phone}`}
+                className="text-slate-600 underline-offset-2 hover:underline"
+              >
                 {venue.phone}
               </a>
             </p>
           )}
           {venue.homepage && (
             <a
-              href={/^https?:\/\//.test(venue.homepage) ? venue.homepage : `https://${venue.homepage}`}
+              href={
+                /^https?:\/\//.test(venue.homepage)
+                  ? venue.homepage
+                  : `https://${venue.homepage}`
+              }
               target="_blank"
               rel="noreferrer"
               className="block text-slate-600 underline-offset-2 hover:underline"
@@ -161,11 +230,16 @@ export default function VenueDetail({
         </div>
         {others.length > 0 && (
           <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm">
-            <p className="text-xs font-semibold text-slate-500">같은 주소에 {others.length}곳 더 있어요</p>
+            <p className="text-xs font-semibold text-slate-500">
+              같은 주소에 {others.length}곳 더 있어요
+            </p>
             <ul className="mt-1">
               {others.map((o) => (
                 <li key={o.id}>
-                  <button onClick={() => onSelectVenue(o.id)} className="py-0.5 text-left text-slate-800 hover:underline">
+                  <button
+                    onClick={() => onSelectVenue(o.id)}
+                    className="py-0.5 text-left text-slate-800 hover:underline"
+                  >
                     {venueTitle(o)} ›
                   </button>
                 </li>
@@ -176,7 +250,10 @@ export default function VenueDetail({
       </div>
 
       {/* 탭 */}
-      <div role="tablist" className="sticky top-0 z-10 flex border-b border-slate-200 bg-white px-2">
+      <div
+        role="tablist"
+        className="sticky top-0 z-10 flex border-b border-slate-200 bg-white px-2"
+      >
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -191,13 +268,30 @@ export default function VenueDetail({
       </div>
 
       <div className="px-5 py-4">
-        {tab === "parking" && <ParkingTab venue={venue} parking={detail.parking} />}
-        {tab === "halls" && <HallsTab halls={detail.halls} schedules={detail.schedules} />}
+        {tab === "parking" && (
+          <ParkingTab
+            venue={venue}
+            parking={detail.parking}
+            canEdit={canEdit}
+            onSaved={refresh}
+          />
+        )}
+        {tab === "halls" && (
+          <HallsTab
+            venueId={venue.id}
+            halls={detail.halls}
+            schedules={detail.schedules}
+            canEdit={canEdit}
+            onSaved={refresh}
+          />
+        )}
         {tab === "photo" && <PhotoTab venue={venue} />}
 
-        <p className="mt-6 rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">
-          정보 입력·수정 기능은 곧 열려요.
-        </p>
+        {!canEdit && (
+          <p className="mt-6 rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">
+            승인된 회원은 로그인하면 정보를 수정할 수 있어요.
+          </p>
+        )}
         {venue.editor && (
           <p className="mt-2 text-center text-[11px] text-slate-400">
             마지막 수정 {venue.editor.nickname} · {formatDate(venue.updated_at)}
@@ -212,16 +306,33 @@ export default function VenueDetail({
 /* ───────────────────────── 공통 ───────────────────────── */
 
 function Row({ label: l, value }: { label: string; value: React.ReactNode }) {
-  const empty = value == null || value === "" || (Array.isArray(value) && value.length === 0);
+  const empty =
+    value == null ||
+    value === "" ||
+    (Array.isArray(value) && value.length === 0);
   return (
     <div className="flex gap-3 py-2 text-sm">
       <dt className="w-28 shrink-0 text-slate-500">{l}</dt>
-      <dd className={empty ? "text-slate-300" : "font-medium whitespace-pre-line text-slate-900"}>{empty ? "미입력" : value}</dd>
+      <dd
+        className={
+          empty
+            ? "text-slate-300"
+            : "font-medium whitespace-pre-line text-slate-900"
+        }
+      >
+        {empty ? "미입력" : value}
+      </dd>
     </div>
   );
 }
 
-function Checked({ at, by }: { at: string | null | undefined; by?: string | null }) {
+function Checked({
+  at,
+  by,
+}: {
+  at: string | null | undefined;
+  by?: string | null;
+}) {
   if (!at) return null;
   const stale = isStale(at);
   return (
@@ -237,18 +348,33 @@ function Section({
   title,
   checkedAt,
   checkedBy,
+  onEdit,
   children,
 }: {
   title: string;
   checkedAt?: string | null;
   checkedBy?: string | null;
+  /** 있으면 제목 옆에 '수정' 버튼 */
+  onEdit?: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <section className={`mb-5 ${isStale(checkedAt) ? "opacity-50" : ""}`}>
+    <section
+      className={`mb-5 ${isStale(checkedAt) && !onEdit ? "opacity-50" : ""}`}
+    >
       <div className="mb-1 flex items-baseline justify-between gap-2">
         <h3 className="text-[15px] font-bold text-slate-900">{title}</h3>
-        <Checked at={checkedAt} by={checkedBy} />
+        <div className="flex items-baseline gap-2">
+          <Checked at={checkedAt} by={checkedBy} />
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="shrink-0 rounded-md border border-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              수정
+            </button>
+          )}
+        </div>
       </div>
       {children}
     </section>
@@ -256,12 +382,27 @@ function Section({
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-400">{children}</div>;
+  return (
+    <div className="rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-400">
+      {children}
+    </div>
+  );
 }
 
 /* ───────────────────────── 주차 ───────────────────────── */
 
-function ParkingTab({ venue, parking }: { venue: Venue; parking: Parking[] }) {
+function ParkingTab({
+  venue,
+  parking,
+  canEdit,
+  onSaved,
+}: {
+  venue: Venue;
+  parking: Parking[];
+  canEdit: boolean;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
   const hasInfo =
     venue.guest_free_minutes != null ||
     venue.parking_capacity != null ||
@@ -275,31 +416,73 @@ function ParkingTab({ venue, parking }: { venue: Venue; parking: Parking[] }) {
 
   return (
     <>
-      <Section title="예식장 주차" checkedAt={venue.parking_checked_at}>
-        {hasInfo ? (
+      <Section
+        title="예식장 주차"
+        checkedAt={venue.parking_checked_at}
+        checkedBy={venue.editor?.nickname}
+        onEdit={canEdit && !editing ? () => setEditing(true) : undefined}
+      >
+        {editing ? (
+          <ParkingEditor
+            venue={venue}
+            onCancel={() => setEditing(false)}
+            onDone={() => {
+              setEditing(false);
+              onSaved();
+            }}
+          />
+        ) : hasInfo ? (
           <dl className="divide-y divide-slate-100">
-            <Row label="하객 무료 주차" value={formatMinutes(venue.guest_free_minutes)} />
+            <Row
+              label="하객 무료 주차"
+              value={formatMinutes(venue.guest_free_minutes)}
+            />
             <Row label="초과 요금" value={overtime} />
-            <Row label="무료 처리 방법" value={venue.guest_free_methods?.map((m) => label(GUEST_FREE_METHOD, m)).join(", ")} />
-            <Row label="주차 규모" value={label(PARKING_CAPACITY, venue.parking_capacity)} />
-            {venue.parking_notes && <Row label="메모" value={venue.parking_notes} />}
+            <Row
+              label="무료 처리 방법"
+              value={venue.guest_free_methods
+                ?.map((m) => label(GUEST_FREE_METHOD, m))
+                .join(", ")}
+            />
+            <Row
+              label="주차 규모"
+              value={label(PARKING_CAPACITY, venue.parking_capacity)}
+            />
+            {venue.parking_notes && (
+              <Row label="메모" value={venue.parking_notes} />
+            )}
           </dl>
         ) : (
           <Empty>아직 입력된 주차 정보가 없어요</Empty>
         )}
       </Section>
 
-      <Section title={`주변 주차장${parking.length ? ` ${parking.length}` : ""}`}>
+      <Section
+        title={`주변 주차장${parking.length ? ` ${parking.length}` : ""}`}
+      >
         {parking.length ? (
           <ul className="space-y-2">
             {parking.map((p) => (
-              <li key={p.id} className={`rounded-xl border border-slate-200 p-3 ${isStale(p.checked_at) ? "opacity-50" : ""}`}>
+              <li
+                key={p.id}
+                className={`rounded-xl border border-slate-200 p-3 ${isStale(p.checked_at) ? "opacity-50" : ""}`}
+              >
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="font-semibold">{p.name}</p>
-                  {p.walk_minutes != null && <p className="shrink-0 text-xs text-slate-500">도보 {p.walk_minutes}분</p>}
+                  {p.walk_minutes != null && (
+                    <p className="shrink-0 text-xs text-slate-500">
+                      도보 {p.walk_minutes}분
+                    </p>
+                  )}
                 </div>
-                {p.fee && <p className="mt-0.5 text-sm text-slate-700">{p.fee}</p>}
-                {p.memo && <p className="mt-0.5 text-sm whitespace-pre-line text-slate-500">{p.memo}</p>}
+                {p.fee && (
+                  <p className="mt-0.5 text-sm text-slate-700">{p.fee}</p>
+                )}
+                {p.memo && (
+                  <p className="mt-0.5 text-sm whitespace-pre-line text-slate-500">
+                    {p.memo}
+                  </p>
+                )}
                 <div className="mt-1">
                   <Checked at={p.checked_at} by={p.editor?.nickname} />
                 </div>
@@ -326,57 +509,157 @@ function floorLabel(f: string | null) {
   return /^B?\d+$/.test(f.trim()) ? `${f.trim()}층` : f;
 }
 
-function HallsTab({ halls, schedules }: { halls: Hall[]; schedules: Schedule[] }) {
-  if (!halls.length) return <Empty>아직 등록된 홀이 없어요</Empty>;
+function HallsTab({
+  venueId,
+  halls,
+  schedules,
+  canEdit,
+  onSaved,
+}: {
+  venueId: string;
+  halls: Hall[];
+  schedules: Schedule[];
+  canEdit: boolean;
+  onSaved: () => void;
+}) {
+  // 수정 중인 홀 id, 새 홀은 "new"
+  const [editing, setEditing] = useState<string | null>(null);
+  const done = () => {
+    setEditing(null);
+    onSaved();
+  };
+  const commonTimes = (hallId: string) =>
+    schedules
+      .filter((s) => s.hall_id === hallId && s.day_type === "common")
+      .map((s) => s.start_time!);
+  const addHall = canEdit && (
+    <div className="mt-2">
+      {editing === "new" ? (
+        <HallEditor
+          venueId={venueId}
+          times={[]}
+          nextSort={halls.length + 1}
+          onCancel={() => setEditing(null)}
+          onDone={done}
+        />
+      ) : (
+        <button
+          onClick={() => setEditing("new")}
+          className="h-11 w-full rounded-xl border border-dashed border-slate-300 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+        >
+          + 홀 추가
+        </button>
+      )}
+    </div>
+  );
+  if (!halls.length)
+    return (
+      <>
+        <Empty>아직 등록된 홀이 없어요</Empty>
+        {addHall}
+      </>
+    );
   const anySimultaneous = schedules.some((s) => s.is_simultaneous);
 
   return (
     <>
       {anySimultaneous && (
-        <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">⚠️ 같은 시간에 다른 홀에서도 예식이 있어요 (동시예식)</p>
+        <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+          ⚠️ 같은 시간에 다른 홀에서도 예식이 있어요 (동시예식)
+        </p>
       )}
       {halls.map((h) => {
         const mine = schedules.filter((s) => s.hall_id === h.id);
-        const byDay = DAY_TYPE_ORDER.map((d) => [d, mine.filter((s) => s.day_type === d)] as const).filter(([, l]) => l.length);
+        const byDay = DAY_TYPE_ORDER.map(
+          (d) => [d, mine.filter((s) => s.day_type === d)] as const,
+        ).filter(([, l]) => l.length);
         return (
-          <Section key={h.id} title={h.name} checkedAt={h.checked_at} checkedBy={h.editor?.nickname}>
-            <p className="text-sm text-slate-500">
-              {[floorLabel(h.floor), label(HALL_TYPE, h.hall_type)].filter(Boolean).join(" · ") || "층·형태 미입력"}
-            </p>
-            {byDay.length ? (
-              <div className="mt-2 space-y-2">
-                {byDay.map(([day, list]) => (
-                  <div key={day}>
-                    <p className="mb-1 text-xs font-semibold text-slate-500">{DAY_TYPE[day]}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {list.map((s) => (
-                        <span
-                          key={s.id}
-                          className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm ${
-                            s.is_simultaneous ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-800"
-                          }`}
-                        >
-                          <b className="font-semibold">{formatTime(s.start_time)}</b>
-                          {s.interval_minutes != null && <span className="text-[11px] text-slate-500">+{s.interval_minutes}분</span>}
-                          {s.is_simultaneous && <span className="text-[11px] font-semibold">동시</span>}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <Section
+            key={h.id}
+            title={h.name}
+            checkedAt={h.checked_at}
+            checkedBy={h.editor?.nickname}
+            onEdit={
+              canEdit && editing !== h.id ? () => setEditing(h.id) : undefined
+            }
+          >
+            {editing === h.id ? (
+              <HallEditor
+                venueId={venueId}
+                hall={h}
+                times={commonTimes(h.id)}
+                nextSort={halls.length + 1}
+                onCancel={() => setEditing(null)}
+                onDone={done}
+              />
             ) : (
-              !h.schedule_note && <p className="mt-2 text-sm text-slate-300">시간표 미입력</p>
+              <>
+                <p className="text-sm text-slate-500">
+                  {[floorLabel(h.floor), label(HALL_TYPE, h.hall_type)]
+                    .filter(Boolean)
+                    .join(" · ") || "층·형태 미입력"}
+                </p>
+                {byDay.length ? (
+                  <div className="mt-2 space-y-2">
+                    {byDay.map(([day, list]) => (
+                      <div key={day}>
+                        <p className="mb-1 text-xs font-semibold text-slate-500">
+                          {DAY_TYPE[day]}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {list.map((s) => (
+                            <span
+                              key={s.id}
+                              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm ${
+                                s.is_simultaneous
+                                  ? "bg-amber-100 text-amber-900"
+                                  : "bg-slate-100 text-slate-800"
+                              }`}
+                            >
+                              <b className="font-semibold">
+                                {formatTime(s.start_time)}
+                              </b>
+                              {s.interval_minutes != null && (
+                                <span className="text-[11px] text-slate-500">
+                                  +{s.interval_minutes}분
+                                </span>
+                              )}
+                              {s.is_simultaneous && (
+                                <span className="text-[11px] font-semibold">
+                                  동시
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  !h.schedule_note && (
+                    <p className="mt-2 text-sm text-slate-300">시간표 미입력</p>
+                  )
+                )}
+                {/* 시간표가 있으면 원문 안내는 중복이라 숨기고, 시간표가 없을 때만 보여줌 */}
+                {!byDay.length && h.schedule_note && (
+                  <p className="mt-2 text-xs leading-relaxed whitespace-pre-line text-slate-500">
+                    🕐 {h.schedule_note}
+                  </p>
+                )}
+                {h.photo_notes && (
+                  <p className="mt-2 rounded-lg bg-slate-50 p-2 text-sm whitespace-pre-line text-slate-700">
+                    📷 {h.photo_notes}
+                  </p>
+                )}
+              </>
             )}
-            {/* 시간표가 있으면 원문 안내는 중복이라 숨기고, 시간표가 없을 때만 보여줌 */}
-            {!byDay.length && h.schedule_note && (
-              <p className="mt-2 text-xs leading-relaxed whitespace-pre-line text-slate-500">🕐 {h.schedule_note}</p>
-            )}
-            {h.photo_notes && <p className="mt-2 rounded-lg bg-slate-50 p-2 text-sm whitespace-pre-line text-slate-700">📷 {h.photo_notes}</p>}
           </Section>
         );
       })}
-      <p className="text-[11px] text-slate-400">+N분 = 같은 홀 다음 예식까지 간격</p>
+      <p className="text-[11px] text-slate-400">
+        +N분 = 같은 홀 다음 예식까지 간격
+      </p>
+      {addHall}
     </>
   );
 }
@@ -407,14 +690,37 @@ function PhotoTab({ venue }: { venue: Venue }) {
         {hasInfo ? (
           <dl className="divide-y divide-slate-100">
             <Row label="원판 지정 업체" value={designated} />
-            <Row label="외부 스냅" value={label(EXTERNAL_SNAP_POLICY, venue.external_snap_policy)} />
-            <Row label="원판 촬영 시점" value={label(OFFICIAL_PHOTO_TIMING, venue.official_photo_timing)} />
-            <Row label="플래시" value={label(FLASH_POLICY, venue.flash_policy)} />
-            <Row label="외부 업체 등록비" value={formatWon(venue.external_vendor_fee)} />
-            <Row label="출입증" value={venue.pass_required == null ? null : venue.pass_required ? "필요" : "불필요"} />
+            <Row
+              label="외부 스냅"
+              value={label(EXTERNAL_SNAP_POLICY, venue.external_snap_policy)}
+            />
+            <Row
+              label="원판 촬영 시점"
+              value={label(OFFICIAL_PHOTO_TIMING, venue.official_photo_timing)}
+            />
+            <Row
+              label="플래시"
+              value={label(FLASH_POLICY, venue.flash_policy)}
+            />
+            <Row
+              label="외부 업체 등록비"
+              value={formatWon(venue.external_vendor_fee)}
+            />
+            <Row
+              label="출입증"
+              value={
+                venue.pass_required == null
+                  ? null
+                  : venue.pass_required
+                    ? "필요"
+                    : "불필요"
+              }
+            />
             <Row label="장비 반입 동선" value={venue.equipment_route} />
             <Row label="신부대기실" value={venue.bridal_room_info} />
-            {venue.photo_notes && <Row label="메모" value={venue.photo_notes} />}
+            {venue.photo_notes && (
+              <Row label="메모" value={venue.photo_notes} />
+            )}
           </dl>
         ) : (
           <Empty>아직 입력된 촬영 규정이 없어요</Empty>
