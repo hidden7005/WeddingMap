@@ -13,6 +13,7 @@ import UserMenu from "./UserMenu";
 import { useAuth } from "./AuthProvider";
 import Link from "next/link";
 import Logo, { APP_NAME } from "./Logo";
+import VenueRequestPrompt from "./VenueRequest";
 
 type Selection = { venueId: string | null; siteKey: string } | null;
 
@@ -202,7 +203,7 @@ export default function MapApp() {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {query.trim() && (searchOpen || !panelContent) ? (
-              <VenueList items={results} onSelect={pickFromSearch} emptyText="검색 결과가 없어요" />
+              <VenueList items={results} onSelect={pickFromSearch} empty={<VenueRequestPrompt key={query.trim()} query={query} />} />
             ) : panelContent ? (
               <div className="pt-3">
                 {query.trim() && (
@@ -238,7 +239,7 @@ export default function MapApp() {
         </div>
         {searchOpen && query.trim() && (
           <div className="mt-2 max-h-[60dvh] overflow-y-auto rounded-xl bg-white shadow-lg">
-            <VenueList items={results} onSelect={pickFromSearch} emptyText="검색 결과가 없어요" />
+            <VenueList items={results} onSelect={pickFromSearch} empty={<VenueRequestPrompt key={query.trim()} query={query} />} />
           </div>
         )}
         <div className="mt-2 flex justify-center">{status}</div>

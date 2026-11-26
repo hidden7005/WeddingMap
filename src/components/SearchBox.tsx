@@ -47,11 +47,15 @@ export function VenueList({
   items,
   onSelect,
   emptyText,
+  empty,
 }: {
   items: VenuePin[];
   onSelect: (v: VenuePin) => void;
   emptyText?: string;
+  /** 결과가 없을 때 보여줄 내용 (emptyText 대신) */
+  empty?: React.ReactNode;
 }) {
+  if (!items.length && empty) return <>{empty}</>;
   if (!items.length) return <p className="p-5 text-center text-sm text-slate-400">{emptyText ?? "결과가 없어요"}</p>;
   return (
     <ul className="divide-y divide-slate-100">

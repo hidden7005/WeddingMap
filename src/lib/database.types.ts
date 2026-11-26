@@ -375,6 +375,35 @@ export type Database = {
           },
         ]
       }
+      venue_requests: {
+        Row: {
+          created_at: string
+          handled_at: string | null
+          id: string
+          location: string | null
+          memo: string | null
+          name: string
+          requested_by: string | null
+          status: string
+        }
+        Insert: {
+          name: string
+          location?: string | null
+          memo?: string | null
+        }
+        Update: {
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venues: {
         Row: {
           biz_no: string | null

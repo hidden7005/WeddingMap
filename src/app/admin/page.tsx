@@ -290,6 +290,8 @@ function ActivityTab({ onChanged, pendingCount, goMembers }: { onChanged: () => 
         </button>
       )}
 
+      <VenueRequests />
+
       <section>
         <h2 className="font-bold">최근 특이사항 · 코멘트</h2>
         {!notes ? (
@@ -766,5 +768,95 @@ function ViewSetting({
         </button>
       </section>
     </div>
+  );
+}
+
+type RequestRow = Tables<"venue_requests"> & { requester: { nickname: string } | null };
+
+/** 식장 등록 요청: 처리 전 요청을 위에, 처리한 요청은 최근 10건 */
+function VenueRequests() {
+  const [rows, setRows] = useState<RequestRow[] | null>(null);
+  const [missing, setMissing] = useState(false);
+  const load = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("venue_requests")
+      .select("*, requester:profiles!venue_requests_requested_by_fkey(nickname)")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) return setMissing(true);
+    setRows(data as RequestRow[]);
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function setStatus(r: RequestRow, status: "done" | "rejected" | "pending") {
+    const { error } = await supabase.from("venue_requests").update({ status }).eq("id", r.id);
+    if (error) return alert("처리하지 못했어요: " + error.message);
+    load();
+  }
+  async function remove(r: RequestRow) {
+    if (!confirm(`‘${r.name}’ 요청을 삭제할까요?`)) return;
+    const { error } = await supabase.from("venue_requests").delete().eq("id", r.id);
+    if (error) return alert("삭제하지 못했어요: " + error.message);
+    load();
+  }
+
+  if (missing) return null;
+  const pending = rows?.filter((r) => r.status === "pending") ?? [];
+  const handled = rows?.filter((r) => r.status !== "pending").slice(0, 10) ?? [];
+  return (
+    <section>
+      <h2 className="font-bold">
+        식장 등록 요청 {pending.length > 0 && <span className="ml-1 rounded-full bg-rose-500 px-2 py-0.5 text-xs text-white">{pending.length}</span>}
+      </h2>
+      {!rows ? (
+        <p className="mt-2 text-sm text-slate-400">불러오는 중…</p>
+      ) : rows.length === 0 ? (
+        <p className="mt-2 rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-400">아직 등록 요청이 없어요</p>
+      ) : (
+        <ul className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-200">
+          {[...pending, ...handled].map((r) => (
+            <li key={r.id} className={`p-3 text-sm ${r.status !== "pending" ? "opacity-60" : ""}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold">
+                    {r.name}
+                    {r.status !== "pending" && (
+                      <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-normal text-slate-600">{r.status === "done" ? "등록 완료" : "반려"}</span>
+                    )}
+                  </p>
+                  {r.location && <p className="text-slate-600 break-all">{r.location}</p>}
+                  {r.memo && <p className="mt-0.5 whitespace-pre-line text-slate-500">{r.memo}</p>}
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {r.requester?.nickname ?? "탈퇴한 회원"} · {whenText(r.created_at)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  {r.status === "pending" ? (
+                    <>
+                      <button onClick={() => setStatus(r, "done")} className="rounded bg-slate-900 px-2 py-1 text-xs text-white">
+                        등록 완료
+                      </button>
+                      <button onClick={() => setStatus(r, "rejected")} className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100">
+                        반려
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={() => setStatus(r, "pending")} className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100">
+                      되돌리기
+                    </button>
+                  )}
+                  <button onClick={() => remove(r)} className="rounded px-2 py-1 text-xs text-rose-600 hover:bg-rose-50">
+                    삭제
+                  </button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-1.5 text-xs text-slate-400">지도에 실제로 추가하는 건 아직 Claude에게 요청해 주세요. ‘등록 완료’는 표시만 바꿔요.</p>
+    </section>
   );
 }
