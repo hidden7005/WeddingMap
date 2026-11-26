@@ -571,6 +571,7 @@ export type Database = {
     }
     Functions: {
       _edit_ignored_columns: { Args: never; Returns: string[] }
+      admin_delete_venue: { Args: { p_request_id: string }; Returns: string }
       admin_stats: { Args: never; Returns: Json }
       can_view: { Args: never; Returns: boolean }
       record_visit: { Args: { p_visitor: string }; Returns: undefined }

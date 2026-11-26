@@ -793,10 +793,12 @@ function VenueRequests() {
     if (error) return alert("처리하지 못했어요: " + error.message);
     load();
   }
-  async function remove(r: RequestRow) {
-    if (!confirm(`‘${r.name}’ 요청을 삭제할까요?`)) return;
-    const { error } = await supabase.from("venue_requests").delete().eq("id", r.id);
+  // 삭제 요청: 예식장을 지도에서 바로 지움 (사본은 DB 백업에 남음)
+  async function deleteVenue(r: RequestRow) {
+    if (!confirm(`‘${r.name}’ 을(를) 지도에서 삭제할까요?\n홀·시간표·특이사항도 함께 지워져요.`)) return;
+    const { data, error } = await supabase.rpc("admin_delete_venue", { p_request_id: r.id });
     if (error) return alert("삭제하지 못했어요: " + error.message);
+    if (data === "already_gone") alert("이미 지도에서 지워진 예식장이에요. 요청만 완료로 바꿨어요.");
     load();
   }
 
@@ -833,7 +835,7 @@ function VenueRequests() {
                     )}
                     {r.status !== "pending" && (
                       <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-normal text-slate-600">
-                        {r.status === "done" ? (r.kind === "delete" ? "삭제 완료" : "등록 완료") : "반려"}
+                        {r.status === "done" ? (r.kind === "delete" ? "삭제함" : "등록 완료") : "반려"}
                       </span>
                     )}
                   </p>
@@ -844,28 +846,34 @@ function VenueRequests() {
                 <div className="flex shrink-0 gap-1">
                   {r.status === "pending" ? (
                     <>
-                      <button onClick={() => setStatus(r, "done")} className="rounded bg-slate-900 px-2 py-1 text-xs text-white">
-                        {r.kind === "delete" ? "삭제 완료" : "등록 완료"}
-                      </button>
+                      {r.kind === "delete" ? (
+                        <button onClick={() => deleteVenue(r)} className="rounded bg-rose-600 px-2 py-1 text-xs text-white">
+                          삭제
+                        </button>
+                      ) : (
+                        <button onClick={() => setStatus(r, "done")} className="rounded bg-slate-900 px-2 py-1 text-xs text-white">
+                          등록 완료
+                        </button>
+                      )}
                       <button onClick={() => setStatus(r, "rejected")} className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100">
                         반려
                       </button>
                     </>
                   ) : (
-                    <button onClick={() => setStatus(r, "pending")} className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100">
-                      되돌리기
-                    </button>
+                    // 지도에서 이미 지운 삭제 요청은 되돌릴 수 없음
+                    !(r.kind === "delete" && r.status === "done") && (
+                      <button onClick={() => setStatus(r, "pending")} className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100">
+                        되돌리기
+                      </button>
+                    )
                   )}
-                  <button onClick={() => remove(r)} className="rounded px-2 py-1 text-xs text-rose-600 hover:bg-rose-50">
-                    삭제
-                  </button>
                 </div>
               </div>
             </li>
           ))}
         </ul>
       )}
-      <p className="mt-1.5 text-xs text-slate-400">지도에 실제로 추가·삭제하는 건 아직 Claude에게 요청해 주세요. ‘완료’ 버튼은 표시만 바꿔요.</p>
+      <p className="mt-1.5 text-xs text-slate-400">등록 요청은 예식장 정보를 Claude에게 주면 지도에 추가해요. ‘등록 완료’는 표시만 바꿔요.</p>
     </section>
   );
 }

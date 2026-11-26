@@ -15,6 +15,7 @@ import Link from "next/link";
 import Logo, { APP_NAME } from "./Logo";
 import VenueRequestPrompt from "./VenueRequest";
 import { APP_VERSION } from "@/lib/version";
+import AdminInbox from "./AdminInbox";
 
 type Selection = { venueId: string | null; siteKey: string } | null;
 
@@ -224,7 +225,10 @@ export default function MapApp() {
         </aside>
         <main className="relative min-w-0 flex-1">
           {map}
-          <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 [&>*]:pointer-events-auto">{status}</div>
+          <div className="pointer-events-none absolute top-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 [&>*]:pointer-events-auto">
+            {status}
+            <AdminInbox onOpenVenue={(id) => selectVenue(id, { pan: true })} onVenueDeleted={() => (clearSelection(), load())} />
+          </div>
           <Legend className="absolute right-[4.5rem] bottom-6" />
           <VersionBadge className="absolute bottom-11 left-3" />
         </main>
@@ -256,7 +260,10 @@ export default function MapApp() {
             <VenueList items={results} onSelect={pickFromSearch} empty={<VenueRequestPrompt key={query.trim()} query={query} />} />
           </div>
         )}
-        <div className="mt-2 flex justify-center">{status}</div>
+        <div className="mt-2 flex flex-col items-center gap-2">
+          {status}
+          <AdminInbox onOpenVenue={(id) => selectVenue(id, { pan: true })} onVenueDeleted={() => (clearSelection(), load())} />
+        </div>
       </div>
 
       {!selection && <Legend className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2" />}
