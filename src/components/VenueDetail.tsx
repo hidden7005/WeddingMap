@@ -125,7 +125,6 @@ export default function VenueDetail({
                 {label(CATEGORY, venue.category)}
                 {venue.category === "auxiliary" && venue.registered_industry ? ` · ${venue.registered_industry}` : ""}
               </span>
-              {venue.source === "user" && <span className="tracking-normal text-amber-700 normal-case">사용자 추가</span>}
             </p>
             <h2 className="mt-1.5 text-[20px] leading-snug font-bold tracking-[-0.02em] text-slate-900">{venueTitle(venue)}</h2>
             <p className="mt-0.5 text-sm text-slate-600">
