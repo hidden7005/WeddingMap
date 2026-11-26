@@ -39,9 +39,9 @@ type Detail = {
 };
 
 const TABS = [
-  { key: "photo", label: "촬영" },
   { key: "halls", label: "홀·시간" },
   { key: "parking", label: "주차" },
+  { key: "photo", label: "촬영" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -93,7 +93,7 @@ export default function VenueDetail({
 }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabKey>("photo");
+  const [tab, setTab] = useState<TabKey>("halls");
   const [reload, setReload] = useState(0);
   const auth = useAuth();
   const canEdit = auth.status === "member";
@@ -532,15 +532,8 @@ function HallsTab({
         {addHall}
       </>
     );
-  const anySimultaneous = schedules.some((s) => s.is_simultaneous);
-
   return (
     <>
-      {anySimultaneous && (
-        <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
-          ⚠️ 같은 시간에 다른 홀에서도 예식이 있어요 (‘겹침’ 표시)
-        </p>
-      )}
       {halls.map((h) => {
         const mine = schedules.filter((s) => s.hall_id === h.id);
         const byDay = DAY_TYPE_ORDER.map(

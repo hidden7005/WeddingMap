@@ -59,7 +59,7 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
         className={
           compact
             ? "relative flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-base font-bold shadow-sm"
-            : "relative flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold hover:bg-slate-100"
+            : "relative flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold whitespace-nowrap hover:bg-slate-100"
         }
         title={member.nickname}
       >
@@ -68,8 +68,9 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
           member.nickname.slice(0, 1)
         ) : (
           <>
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-xs text-white">{member.nickname.slice(0, 1)}</span>
-            {member.nickname}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-a.png" alt="" className="h-7 w-7 shrink-0 rounded-full border border-slate-200 bg-white object-contain p-1" draggable={false} />
+            <span className="max-w-[7rem] truncate">{member.nickname}</span>
           </>
         )}
       </button>

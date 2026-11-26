@@ -195,10 +195,10 @@ export default function MapApp() {
           <div className="border-b border-slate-100 p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h1>
-                <button onClick={refreshHome} aria-label="언아더데이 맵 처음 화면으로" className="flex items-center gap-2.5">
-                  <Logo variant="wordmark" className="h-4" />
+                <button onClick={refreshHome} aria-label="언아더데이 맵 처음 화면으로" className="flex items-center gap-2">
+                  <Logo variant="wordmark" className="h-[13px]" />
                   <span className="h-5 w-px bg-slate-300" aria-hidden />
-                  <span className="text-sm font-semibold text-slate-600">{APP_NAME}</span>
+                  <span className="text-sm font-semibold whitespace-nowrap text-slate-600">{APP_NAME}</span>
                 </button>
               </h1>
               <UserMenu />

@@ -79,26 +79,6 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
 
   return (
     <div>
-      {status === "member" ? (
-        composing ? (
-          <Composer
-            venueId={venueId}
-            section={section}
-            onCancel={() => setComposing(false)}
-            onDone={() => {
-              setComposing(false);
-              load();
-            }}
-          />
-        ) : (
-          <button
-            onClick={() => setComposing(true)}
-            className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            <span className="text-lg leading-none">＋</span> 특이사항 쓰기 (사진 최대 4장)
-          </button>
-        )
-      ) : null}
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
       {!notes ? (
@@ -142,6 +122,26 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
         </ul>
       )}
 
+      {status === "member" ? (
+        composing ? (
+          <Composer
+            venueId={venueId}
+            section={section}
+            onCancel={() => setComposing(false)}
+            onDone={() => {
+              setComposing(false);
+              load();
+            }}
+          />
+        ) : (
+          <button
+            onClick={() => setComposing(true)}
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            <span className="text-lg leading-none">＋</span> 특이사항 쓰기 (사진 최대 4장)
+          </button>
+        )
+      ) : null}
       {status === "guest" && (
         <p className="mt-3 rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">
           <Link href="/login" className="font-semibold underline">
