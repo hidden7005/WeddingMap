@@ -129,13 +129,12 @@ export function HallEditor({
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return setError("홀 이름을 적어주세요");
     if (parsed.invalid.length)
       return setError(`알아볼 수 없는 시간: ${parsed.invalid.join(", ")}`);
     setBusy(true);
     setError(null);
     const row = {
-      name: name.trim(),
+      name: name.trim() || "단독홀", // 홀 이름이 없는 곳은 '단독홀'로
       floor: floor.trim() || null,
       hall_type: hallType,
       is_outdoor: outdoor,
@@ -232,6 +231,7 @@ export function HallEditor({
           />
         </Field>
       </div>
+      <p className="-mt-2 text-xs text-slate-400">홀 이름이 없으면 비워두세요. ‘단독홀’로 저장돼요.</p>
       <Field
         label="예식 형태"
         hint="분리: 예식홀과 식사 연회장이 나뉨 · 동시: 한 공간에서 예식과 식사를 함께 · 야외는 함께 고를 수 있어요"
