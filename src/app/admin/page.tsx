@@ -12,6 +12,7 @@ import { suggestCode, teamLabel } from "@/lib/teams";
 import { DAY_TYPE, EXTERNAL_SNAP_POLICY, FLASH_POLICY, GUEST_FREE_METHOD, HALL_TYPE, OFFICIAL_PHOTO_TIMING, PARKING_CAPACITY } from "@/lib/labels";
 import { useAuth } from "@/components/AuthProvider";
 import Logo, { APP_NAME } from "@/components/Logo";
+import { APP_VERSION } from "@/lib/version";
 
 type Stats = Views<"member_login_stats">;
 type Member = Tables<"members"> & { nickname?: string; stats?: Stats };
@@ -103,7 +104,7 @@ function Admin({
         <h1 className="flex items-center gap-2.5">
           <Logo variant="wordmark" className="h-4" />
           <span className="h-5 w-px bg-slate-300" aria-hidden />
-          <span className="text-sm font-semibold text-slate-600">{APP_NAME} 관리자</span>
+          <span className="text-sm font-semibold text-slate-600">{APP_NAME} 관리자 <span className="ml-1 text-xs font-normal text-slate-400">v{APP_VERSION}</span></span>
         </h1>
         <Link href="/" className="text-sm text-slate-500 hover:text-slate-900">
           지도로 돌아가기 ›

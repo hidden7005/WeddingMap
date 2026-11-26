@@ -206,7 +206,11 @@ export default function LoginPage() {
               <button disabled={busy} className={primaryBtn}>
                 {busy ? "확인 중…" : "다음"}
               </button>
-              <p className="text-center text-xs text-slate-400">처음이신가요? 이메일을 입력하면 가입 신청 화면으로 안내해요.</p>
+              <p className="text-center text-xs leading-relaxed text-slate-400">
+                처음이신가요?
+                <br />
+                이메일을 입력하면 가입 신청 화면으로 안내해요.
+              </p>
             </form>
           )}
 

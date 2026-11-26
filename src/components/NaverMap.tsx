@@ -5,7 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { gridCluster, type Site } from "@/lib/sites";
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID;
-const KOREA_CENTER = { lat: 36.35, lng: 127.85 };
+/** 현재 위치를 못 받으면 서울 중심(시청)에서 시작 */
+const SEOUL_CENTER = { lat: 37.5665, lng: 126.978 };
+const START_ZOOM = 12;
+const MY_LOCATION_ZOOM = 14;
 /** 이 줌 이상이면 클러스터를 풀고 개별 마커 */
 const UNCLUSTER_ZOOM = 14;
 /** 이 줌 이상이면 마커 아래 이름 표시 */
@@ -23,6 +26,8 @@ type Props = {
   /** 하단 시트에 가려지는 높이(px). 포커스 시 마커가 시트 위로 오도록 보정 */
   bottomInset?: number;
   showZoomControl?: boolean;
+  /** 처음 열 때 현재 위치로 이동 (예식장 링크로 들어온 경우엔 false) */
+  autoLocate?: boolean;
   /** 현재 위치 버튼 위치 (Tailwind 클래스) */
   locateClassName?: string;
 };
@@ -51,6 +56,7 @@ export default function NaverMap({
   focus,
   bottomInset = 0,
   showZoomControl = false,
+  autoLocate = true,
   locateClassName = "right-3 bottom-6",
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -65,6 +71,8 @@ export default function NaverMap({
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const meMarkerRef = useRef<naver.maps.Marker | null>(null);
+  /** 사용자가 지도를 직접 움직였거나 마커를 눌렀는지 (그러면 첫 위치 이동을 안 함) */
+  const userMovedRef = useRef(false);
 
   // 최신 콜백을 ref로 들고 있어 마커 리스너를 매번 다시 달지 않아도 되게
   const onSelectRef = useRef(onSelectSite);
@@ -85,8 +93,8 @@ export default function NaverMap({
   useEffect(() => {
     if (!scriptReady || !containerRef.current || mapRef.current) return;
     const map = new naver.maps.Map(containerRef.current, {
-      center: new naver.maps.LatLng(KOREA_CENTER.lat, KOREA_CENTER.lng),
-      zoom: 7,
+      center: new naver.maps.LatLng(SEOUL_CENTER.lat, SEOUL_CENTER.lng),
+      zoom: START_ZOOM,
       minZoom: 6,
       zoomControl: showZoomControl,
       zoomControlOptions: { position: naver.maps.Position.RIGHT_CENTER },
@@ -97,9 +105,10 @@ export default function NaverMap({
     mapRef.current = map;
     const idle = naver.maps.Event.addListener(map, "idle", () => setIdleTick((t) => t + 1));
     const click = naver.maps.Event.addListener(map, "click", () => onMapClickRef.current?.());
+    const drag = naver.maps.Event.addListener(map, "dragstart", () => (userMovedRef.current = true));
     setMapReady(true);
     return () => {
-      naver.maps.Event.removeListener([idle, click]);
+      naver.maps.Event.removeListener([idle, click, drag]);
     };
   }, [scriptReady, showZoomControl]);
 
@@ -133,7 +142,10 @@ export default function NaverMap({
           anchor: new naver.maps.Point(14, 32),
         },
       });
-      naver.maps.Event.addListener(marker, "click", () => onSelectRef.current(site));
+      naver.maps.Event.addListener(marker, "click", () => {
+        userMovedRef.current = true;
+        onSelectRef.current(site);
+      });
       markersRef.current.push(marker);
     };
 
@@ -166,6 +178,7 @@ export default function NaverMap({
         },
       });
       naver.maps.Event.addListener(marker, "click", () => {
+        userMovedRef.current = true;
         const b = new naver.maps.LatLngBounds(
           new naver.maps.LatLng(Math.min(...c.items.map((s) => s.lat)), Math.min(...c.items.map((s) => s.lng))),
           new naver.maps.LatLng(Math.max(...c.items.map((s) => s.lat)), Math.max(...c.items.map((s) => s.lng))),
@@ -189,7 +202,7 @@ export default function NaverMap({
   };
 
   /** 내 위치 점 표시 (move 면 그 위치로 지도 이동) */
-  const showMe = useCallback((c: GeolocationCoordinates, move: boolean) => {
+  const showMe = useCallback((c: GeolocationCoordinates, move: boolean, zoom = 15) => {
     const map = mapRef.current;
     if (!map) return;
     const p = new naver.maps.LatLng(c.latitude, c.longitude);
@@ -203,7 +216,7 @@ export default function NaverMap({
       });
     } else meMarkerRef.current.setPosition(p);
     if (move) {
-      if (map.getZoom() < 15) map.setZoom(15, false);
+      if (map.getZoom() < zoom) map.setZoom(zoom, false);
       map.setCenter(p);
       if (bottomInset) map.panBy(new naver.maps.Point(0, bottomInset / 2));
     }
@@ -235,16 +248,18 @@ export default function NaverMap({
     );
   };
 
-  // 이미 위치 권한을 허용한 경우에만, 묻지 않고 내 위치 점을 조용히 표시 (지도는 그대로)
+  // 처음 열 때 현재 위치로 (첫 방문이면 브라우저가 위치 권한을 물어봄). 못 받으면 서울 중심 그대로.
+  // 위치를 받기 전에 사용자가 검색·예식장 선택으로 지도를 옮겼으면 이동하지 않고 파란 점만 표시
+  const focusRef = useRef(focus);
+  focusRef.current = focus;
   useEffect(() => {
-    if (!mapReady || !navigator.permissions || !navigator.geolocation) return;
-    navigator.permissions
-      .query({ name: "geolocation" as PermissionName })
-      .then((st) => {
-        if (st.state === "granted")
-          navigator.geolocation.getCurrentPosition((pos) => showMe(pos.coords, false), () => {}, { maximumAge: 60000, timeout: 7000 });
-      })
-      .catch(() => {});
+    if (!mapReady || !navigator.geolocation || !window.isSecureContext) return;
+    const startFocus = focusRef.current;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => showMe(pos.coords, autoLocate && focusRef.current === startFocus && !userMovedRef.current, MY_LOCATION_ZOOM),
+      () => {},
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapReady]);
 

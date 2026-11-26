@@ -14,6 +14,7 @@ import { useAuth } from "./AuthProvider";
 import Link from "next/link";
 import Logo, { APP_NAME } from "./Logo";
 import VenueRequestPrompt from "./VenueRequest";
+import { APP_VERSION } from "@/lib/version";
 
 type Selection = { venueId: string | null; siteKey: string } | null;
 
@@ -165,6 +166,7 @@ export default function MapApp() {
       focus={focus}
       bottomInset={!isDesktop && selection ? halfHeight : 0}
       showZoomControl={isDesktop}
+      autoLocate={!searchParams.get("v")}
       locateClassName={isDesktop ? "right-4 bottom-16" : "right-3 bottom-6"}
     />
   );
@@ -222,6 +224,7 @@ export default function MapApp() {
           {map}
           <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 [&>*]:pointer-events-auto">{status}</div>
           <Legend className="absolute right-4 bottom-6" />
+          <VersionBadge className="absolute bottom-11 left-3" />
         </main>
       </div>
     );
@@ -246,6 +249,7 @@ export default function MapApp() {
       </div>
 
       {!selection && <Legend className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2" />}
+      <VersionBadge className="absolute bottom-11 left-3 z-10" />
 
       {panelContent && (
         <BottomSheet snap={snap} onSnapChange={setSnap} closing={sheetClosing} onClosed={clearSelection}>
@@ -300,5 +304,14 @@ function Intro({ count }: { count?: number }) {
         <li>🔢 숫자가 적힌 핀은 같은 건물에 있는 예식장 수예요.</li>
       </ul>
     </div>
+  );
+}
+
+/** 간짜장처럼 지도 왼쪽 아래 작은 버전 표시 (네이버 로고 바로 위) */
+function VersionBadge({ className = "" }: { className?: string }) {
+  return (
+    <span className={`pointer-events-none rounded-md border border-slate-200 bg-white/85 px-2 py-0.5 text-[11px] font-semibold text-slate-500 ${className}`}>
+      v{APP_VERSION}
+    </span>
   );
 }
