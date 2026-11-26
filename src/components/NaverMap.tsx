@@ -124,13 +124,26 @@ export default function NaverMap({
     const projection = map.getProjection();
     const visible = sites.filter((s) => bounds.hasLatLng(new naver.maps.LatLng(s.lat, s.lng)));
 
+    // 거의 같은 위치의 핀은 옆으로 살짝 벌려서 모두 보이게 (예: 같은 단지 A동·B동)
+    const placed: { x: number; y: number }[] = [];
+    const spreadOffset = (site: Site) => {
+      const p = projection.fromCoordToOffset(new naver.maps.LatLng(site.lat, site.lng));
+      let dx = 0;
+      while (placed.some((q) => Math.abs(q.x - (p.x + dx)) < 26 && Math.abs(q.y - p.y) < 26)) dx += 30;
+      // 이웃 핀과 이름표가 겹치지 않게: 근처에 핀이 있으면 이름표를 위/아래 번갈아
+      const near = placed.filter((q) => Math.abs(q.x - (p.x + dx)) < 120 && Math.abs(q.y - p.y) < 40).length;
+      placed.push({ x: p.x + dx, y: p.y });
+      return { dx, labelAbove: near % 2 === 1 };
+    };
+
     const addSiteMarker = (site: Site) => {
+      const { dx, labelAbove } = spreadOffset(site);
       const first = site.venues[0];
       const selected = site.key === selectedSiteKey;
       const count = site.venues.length;
       const label =
         zoom >= LABEL_ZOOM || selected
-          ? `<div class="wm-pin-label">${escapeHtml(first.name)}${count > 1 ? ` 외 ${count - 1}` : ""}</div>`
+          ? `<div class="wm-pin-label${labelAbove ? " wm-pin-label-above" : ""}">${escapeHtml(first.name)}${count > 1 ? ` 외 ${count - 1}` : ""}</div>`
           : "";
       const marker = new naver.maps.Marker({
         map,
@@ -139,7 +152,7 @@ export default function NaverMap({
         title: site.venues.map((v) => v.name).join(", "),
         icon: {
           content: `<div class="wm-pin" data-selected="${selected}" style="--pin-color:${pinColor(first.category)}"><span>${count > 1 ? count : ""}</span></div>${label}`,
-          anchor: new naver.maps.Point(14, 32),
+          anchor: new naver.maps.Point(14 - dx, 32),
         },
       });
       naver.maps.Event.addListener(marker, "click", () => {

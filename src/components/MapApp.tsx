@@ -141,7 +141,7 @@ export default function MapApp() {
         <div className="flex items-start justify-between px-5 pt-1 pb-2">
           <div>
             <p className="text-xs font-semibold text-slate-500">같은 주소 {selectedSite.venues.length}곳</p>
-            <p className="mt-0.5 text-sm text-slate-700">{selectedSite.key}</p>
+            <p className="mt-0.5 text-sm text-slate-700">{selectedSite.address}</p>
           </div>
           <button onClick={requestClose} aria-label="닫기" className="-mr-2 rounded-full p-2 text-slate-400 hover:bg-slate-100">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

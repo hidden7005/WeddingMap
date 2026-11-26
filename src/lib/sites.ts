@@ -12,9 +12,10 @@ export type VenuePin = {
   category: string;
 };
 
-/** 같은 도로명주소 = 지도 위 한 지점(site) */
+/** 지도 위 한 지점(site): 같은 주소·같은 위치의 예식장 묶음 */
 export type Site = {
-  key: string; // road_address
+  key: string; // 주소 (같은 주소가 나뉘면 뒤에 #2, #3…)
+  address: string;
   lat: number;
   lng: number;
   venues: VenuePin[];
@@ -36,20 +37,44 @@ export function toPins(rows: Views<"venue_map">[]): VenuePin[] {
     }));
 }
 
+/** 같은 지점으로 묶는 거리: 주소가 같아도 이보다 멀면 (예: 같은 단지의 A동·B동) 핀을 나눔 */
+export const SAME_SITE_METERS = 5;
+
+function meters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const dy = (a.lat - b.lat) * 111_000;
+  const dx = (a.lng - b.lng) * 111_000 * Math.cos((a.lat * Math.PI) / 180);
+  return Math.hypot(dx, dy);
+}
+
+/** 같은 도로명주소이면서 거의 같은 좌표(5m 이내) = 지도 위 한 지점(site) */
 export function groupSites(pins: VenuePin[]): Site[] {
-  const map = new Map<string, Site>();
+  const byAddress = new Map<string, VenuePin[]>();
   for (const p of pins) {
-    const s = map.get(p.road_address);
-    if (s) s.venues.push(p);
-    else map.set(p.road_address, { key: p.road_address, lat: p.lat, lng: p.lng, venues: [p] });
+    const l = byAddress.get(p.road_address);
+    if (l) l.push(p);
+    else byAddress.set(p.road_address, [p]);
   }
-  for (const s of map.values()) {
-    // 좌표는 평균 (대부분 동일)
-    s.lat = s.venues.reduce((a, v) => a + v.lat, 0) / s.venues.length;
-    s.lng = s.venues.reduce((a, v) => a + v.lng, 0) / s.venues.length;
-    s.venues.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+  const sites: Site[] = [];
+  for (const [address, list] of byAddress) {
+    const groups: VenuePin[][] = [];
+    for (const p of list) {
+      const g = groups.find((g) => meters(g[0], p) <= SAME_SITE_METERS);
+      if (g) g.push(p);
+      else groups.push([p]);
+    }
+    groups.forEach((venues, i) => {
+      venues.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+      sites.push({
+        // 첫 묶음은 주소 그대로 (기존 링크·선택 유지), 나뉜 곳은 #2, #3…
+        key: i === 0 ? address : `${address}#${i + 1}`,
+        address,
+        lat: venues.reduce((a, v) => a + v.lat, 0) / venues.length,
+        lng: venues.reduce((a, v) => a + v.lng, 0) / venues.length,
+        venues,
+      });
+    });
   }
-  return [...map.values()];
+  return sites;
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");

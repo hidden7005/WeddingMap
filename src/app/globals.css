@@ -109,3 +109,8 @@ body {
   text-transform: uppercase;
   color: #999999;
 }
+
+/* 바로 옆에 다른 핀이 있으면 이름표를 핀 위에 */
+.wm-pin-label-above {
+  top: -24px;
+}

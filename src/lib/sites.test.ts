@@ -19,12 +19,12 @@ const pins: VenuePin[] = rows.map((r, i) => ({
   category: "wedding_hall",
 }));
 
-test("같은 도로명주소는 한 지점으로 묶인다 (28개 주소, 59곳)", () => {
+test("같은 도로명주소·같은 위치는 한 지점으로 묶인다 (주소 겹침 28곳 중 5m 넘게 떨어진 3곳은 나눔)", () => {
   const sites = groupSites(pins);
-  assert.equal(sites.length, 821 - 59 + 28);
+  assert.equal(sites.length, 821 - 53 + 25);
   const multi = sites.filter((s) => s.venues.length > 1);
-  assert.equal(multi.length, 28);
-  assert.equal(multi.reduce((a, s) => a + s.venues.length, 0), 59);
+  assert.equal(multi.length, 25);
+  assert.equal(multi.reduce((a, s) => a + s.venues.length, 0), 53);
 });
 
 test("검색: 이름 우선, 지역 AND 검색, 공백 무시", () => {
@@ -57,4 +57,17 @@ test("포맷", () => {
   assert.equal(isStale("2025-11-01T00:00:00Z", now), true);
   assert.equal(isStale("2026-01-01T00:00:00Z", now), false);
   assert.equal(isStale(null, now), false);
+});
+
+test("같은 주소라도 5m 넘게 떨어지면 핀을 나눔 (같은 단지 A동·B동)", () => {
+  const base = { branch_name: null, sido: "서울특별시", sigungu: "마포구", road_address: "서울특별시 마포구 마포대로 92", category: "wedding_hall" };
+  const sites = groupSites([
+    { ...base, id: "a", name: "글래드호텔 마포", lat: 37.5429306, lng: 126.9512418 },
+    { ...base, id: "b", name: "아펠가모 공덕", lat: 37.5428496, lng: 126.9513323 },
+    { ...base, id: "c", name: "같은 자리", lat: 37.5429306, lng: 126.9512418 },
+  ]);
+  assert.equal(sites.length, 2);
+  assert.deepEqual(sites.map((s) => s.venues.length).sort(), [1, 2]);
+  assert.ok(sites.every((s) => s.address === base.road_address));
+  assert.equal(new Set(sites.map((s) => s.key)).size, 2);
 });
