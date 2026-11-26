@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
 import type { Tables } from "@/lib/database.types";
 import { formatDate } from "@/lib/format";
@@ -301,7 +302,8 @@ function Lightbox({ srcs, start, caption, onClose }: { srcs: (string | undefined
     return () => window.removeEventListener("keydown", onKey);
   }, [go, onClose]);
 
-  return (
+  // 하단 시트 안에서 열려도 화면 전체를 덮도록 body 에 띄움
+  return createPortal(
     <div
       className="fixed inset-0 z-[60] flex flex-col bg-black/95"
       onClick={onClose}
@@ -340,6 +342,7 @@ function Lightbox({ srcs, start, caption, onClose }: { srcs: (string | undefined
         )}
       </div>
       {caption && <p className="p-4 text-center text-sm whitespace-pre-line text-white/90">{caption}</p>}
-    </div>
+    </div>,
+    document.body,
   );
 }

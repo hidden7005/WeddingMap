@@ -117,7 +117,7 @@ export default function VenueDetail({
           <div className="min-w-0">
             <span
               className={`inline-block rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${
-                isHotel(venue.category) ? "bg-indigo-50 text-hotel" : venue.category === "auxiliary" ? "bg-slate-100 text-etc" : "bg-brand-soft text-brand"
+                isHotel(venue.category) ? "bg-hotel-soft text-hotel" : venue.category === "auxiliary" ? "bg-slate-100 text-etc" : "bg-brand-soft text-brand"
               }`}
             >
               {label(CATEGORY, venue.category)}
@@ -363,7 +363,10 @@ function HallsTab({ halls, schedules }: { halls: Hall[]; schedules: Schedule[] }
             ) : (
               !h.schedule_note && <p className="mt-2 text-sm text-slate-300">시간표 미입력</p>
             )}
-            {h.schedule_note && <p className="mt-2 text-xs leading-relaxed whitespace-pre-line text-slate-500">🕐 {h.schedule_note}</p>}
+            {/* 시간표가 있으면 원문 안내는 중복이라 숨기고, 시간표가 없을 때만 보여줌 */}
+            {!byDay.length && h.schedule_note && (
+              <p className="mt-2 text-xs leading-relaxed whitespace-pre-line text-slate-500">🕐 {h.schedule_note}</p>
+            )}
             {h.photo_notes && <p className="mt-2 rounded-lg bg-slate-50 p-2 text-sm whitespace-pre-line text-slate-700">📷 {h.photo_notes}</p>}
           </Section>
         );

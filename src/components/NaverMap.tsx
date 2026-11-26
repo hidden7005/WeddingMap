@@ -23,6 +23,8 @@ type Props = {
   /** 하단 시트에 가려지는 높이(px). 포커스 시 마커가 시트 위로 오도록 보정 */
   bottomInset?: number;
   showZoomControl?: boolean;
+  /** 현재 위치 버튼 위치 (Tailwind 클래스) */
+  locateClassName?: string;
 };
 
 declare global {
@@ -49,6 +51,7 @@ export default function NaverMap({
   focus,
   bottomInset = 0,
   showZoomControl = false,
+  locateClassName = "right-3 bottom-6",
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<naver.maps.Map | null>(null);
@@ -58,6 +61,10 @@ export default function NaverMap({
   const [authError, setAuthError] = useState(false);
   const [idleTick, setIdleTick] = useState(0);
   const [origin, setOrigin] = useState("");
+  const [locating, setLocating] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const meMarkerRef = useRef<naver.maps.Marker | null>(null);
 
   // 최신 콜백을 ref로 들고 있어 마커 리스너를 매번 다시 달지 않아도 되게
   const onSelectRef = useRef(onSelectSite);
@@ -175,6 +182,72 @@ export default function NaverMap({
     if (mapReady) draw();
   }, [mapReady, idleTick, draw]);
 
+  const showToast = (msg: string) => {
+    setToast(msg);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  };
+
+  /** 내 위치 점 표시 (move 면 그 위치로 지도 이동) */
+  const showMe = useCallback((c: GeolocationCoordinates, move: boolean) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const p = new naver.maps.LatLng(c.latitude, c.longitude);
+    if (!meMarkerRef.current) {
+      meMarkerRef.current = new naver.maps.Marker({
+        map,
+        position: p,
+        zIndex: 1100,
+        clickable: false,
+        icon: { content: '<div class="wm-me" aria-label="내 위치"></div>', anchor: new naver.maps.Point(11, 11) },
+      });
+    } else meMarkerRef.current.setPosition(p);
+    if (move) {
+      if (map.getZoom() < 15) map.setZoom(15, false);
+      map.setCenter(p);
+      if (bottomInset) map.panBy(new naver.maps.Point(0, bottomInset / 2));
+    }
+  }, [bottomInset]);
+
+  // 버튼을 누를 때 브라우저가 위치 권한을 물어봄 (간짜장과 같은 방식)
+  const locateMe = () => {
+    if (locating) return;
+    if (!navigator.geolocation) return showToast("이 브라우저에서는 위치 확인을 지원하지 않아요");
+    if (!window.isSecureContext) return showToast("현재 위치는 HTTPS 주소에서만 쓸 수 있어요");
+    setLocating(true);
+    showToast("현재 위치를 확인하고 있어요");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        showMe(pos.coords, true);
+        showToast("현재 위치로 이동했어요");
+      },
+      (err) => {
+        setLocating(false);
+        const messages: Record<number, string> = {
+          1: "위치 접근이 차단돼 있어요. 브라우저(사이트) 설정에서 위치 권한을 허용해 주세요",
+          2: "현재 위치를 확인할 수 없어요. GPS·위치 서비스를 켜 주세요",
+          3: "위치 확인 시간이 초과됐어요. 다시 눌러 주세요",
+        };
+        showToast(messages[err.code] ?? "위치를 확인하지 못했어요");
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+    );
+  };
+
+  // 이미 위치 권한을 허용한 경우에만, 묻지 않고 내 위치 점을 조용히 표시 (지도는 그대로)
+  useEffect(() => {
+    if (!mapReady || !navigator.permissions || !navigator.geolocation) return;
+    navigator.permissions
+      .query({ name: "geolocation" as PermissionName })
+      .then((st) => {
+        if (st.state === "granted")
+          navigator.geolocation.getCurrentPosition((pos) => showMe(pos.coords, false), () => {}, { maximumAge: 60000, timeout: 7000 });
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady]);
+
   // 검색·URL 등으로 특정 위치에 포커스
   useEffect(() => {
     const map = mapRef.current;
@@ -197,6 +270,28 @@ export default function NaverMap({
         />
       )}
       <div ref={containerRef} className="h-full w-full" />
+      {mapReady && (
+        <button
+          type="button"
+          onClick={locateMe}
+          disabled={locating}
+          aria-label="현재 위치로 이동"
+          title="현재 위치로 이동"
+          aria-busy={locating}
+          className={`absolute z-10 flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[#0071e3] shadow-[0_4px_18px_rgba(0,0,0,0.15)] transition active:scale-95 disabled:cursor-wait disabled:opacity-60 ${locateClassName}`}
+        >
+          <svg viewBox="0 0 24 24" className="h-[23px] w-[23px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <circle cx="12" cy="12" r="7" />
+            <circle cx="12" cy="12" r="2" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+          </svg>
+        </button>
+      )}
+      {toast && (
+        <div role="status" className="pointer-events-none absolute inset-x-0 top-20 z-40 flex justify-center px-6">
+          <div className="max-w-sm rounded-full bg-slate-900/85 px-4 py-2 text-center text-[13px] font-medium text-white shadow-lg">{toast}</div>
+        </div>
+      )}
       {(!CLIENT_ID || authError) && (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
           <div className="max-w-sm rounded-2xl bg-white p-5 text-sm shadow-lg">

@@ -6,15 +6,13 @@ import { supabase } from "@/lib/supabase";
 import { groupSites, searchPins, toPins, type Site, type VenuePin } from "@/lib/sites";
 import NaverMap, { type MapFocus } from "./NaverMap";
 import VenueDetail from "./VenueDetail";
-import BottomSheet, { type SheetSnap } from "./BottomSheet";
+import BottomSheet, { sheetHalfHeight, type SheetSnap } from "./BottomSheet";
 import { SearchInput, VenueList } from "./SearchBox";
 import { useMediaQuery } from "./useMediaQuery";
 import UserMenu from "./UserMenu";
 import { useAuth } from "./AuthProvider";
 import Link from "next/link";
 import Logo, { APP_NAME } from "./Logo";
-
-const PEEK_HEIGHT = 300;
 
 type Selection = { venueId: string | null; siteKey: string } | null;
 
@@ -29,7 +27,15 @@ export default function MapApp() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [selection, setSelection] = useState<Selection>(null);
   const [focus, setFocus] = useState<MapFocus | null>(null);
-  const [snap, setSnap] = useState<SheetSnap>("peek");
+  const [snap, setSnap] = useState<SheetSnap>("half");
+  const [sheetClosing, setSheetClosing] = useState(false);
+  const [halfHeight, setHalfHeight] = useState(0);
+  useEffect(() => {
+    const update = () => setHalfHeight(sheetHalfHeight());
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
   const initialVenue = useRef(searchParams.get("v"));
 
   // 예식장 목록 로드
@@ -69,8 +75,11 @@ export default function MapApp() {
     (id: string, opts: { pan?: boolean } = {}) => {
       const site = siteByVenue.get(id);
       if (!site) return;
-      setSelection({ venueId: id, siteKey: site.key });
-      setSnap("peek");
+      setSelection((prev) => {
+        if (!prev) setSnap("half"); // 처음 열 때만 절반으로, 열려 있으면 크기 유지
+        return { venueId: id, siteKey: site.key };
+      });
+      setSheetClosing(false);
       syncUrl(id);
       if (opts.pan) setFocus({ lat: site.lat, lng: site.lng, nonce: Date.now() });
     },
@@ -80,8 +89,11 @@ export default function MapApp() {
   const selectSite = useCallback(
     (site: Site) => {
       if (site.venues.length === 1) return selectVenue(site.venues[0].id);
-      setSelection({ venueId: null, siteKey: site.key });
-      setSnap("peek");
+      setSelection((prev) => {
+        if (!prev) setSnap("half");
+        return { venueId: null, siteKey: site.key };
+      });
+      setSheetClosing(false);
       syncUrl(null);
     },
     [selectVenue],
@@ -89,8 +101,14 @@ export default function MapApp() {
 
   const clearSelection = useCallback(() => {
     setSelection(null);
+    setSheetClosing(false);
     syncUrl(null);
   }, []);
+  // 모바일은 시트가 내려가는 애니메이션 뒤에 닫음
+  const requestClose = useCallback(() => {
+    if (isDesktop) clearSelection();
+    else setSheetClosing(true);
+  }, [isDesktop, clearSelection]);
 
   // ?v=<id> 로 들어온 경우 해당 예식장 열기
   useEffect(() => {
@@ -114,7 +132,7 @@ export default function MapApp() {
         venueId={selection.venueId}
         siblings={selectedSite.venues}
         onSelectVenue={(id) => selectVenue(id)}
-        onClose={clearSelection}
+        onClose={requestClose}
       />
     ) : (
       <div>
@@ -123,7 +141,7 @@ export default function MapApp() {
             <p className="text-xs font-semibold text-slate-500">같은 주소 {selectedSite.venues.length}곳</p>
             <p className="mt-0.5 text-sm text-slate-700">{selectedSite.key}</p>
           </div>
-          <button onClick={clearSelection} aria-label="닫기" className="-mr-2 rounded-full p-2 text-slate-400 hover:bg-slate-100">
+          <button onClick={requestClose} aria-label="닫기" className="-mr-2 rounded-full p-2 text-slate-400 hover:bg-slate-100">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
@@ -141,11 +159,12 @@ export default function MapApp() {
       onSelectSite={selectSite}
       onMapClick={() => {
         setSearchOpen(false);
-        if (!isDesktop && snap === "full") setSnap("peek");
+        if (!isDesktop && selection) requestClose(); // 간짜장처럼 지도를 누르면 정보 창 닫힘
       }}
       focus={focus}
-      bottomInset={!isDesktop && selection ? PEEK_HEIGHT : 0}
+      bottomInset={!isDesktop && selection ? halfHeight : 0}
       showZoomControl={isDesktop}
+      locateClassName={isDesktop ? "right-4 bottom-16" : "right-3 bottom-6"}
     />
   );
 
@@ -228,7 +247,7 @@ export default function MapApp() {
       {!selection && <Legend className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2" />}
 
       {panelContent && (
-        <BottomSheet snap={snap} onSnapChange={setSnap} peekHeight={PEEK_HEIGHT}>
+        <BottomSheet snap={snap} onSnapChange={setSnap} closing={sheetClosing} onClosed={clearSelection}>
           {panelContent}
         </BottomSheet>
       )}
