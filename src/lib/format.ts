@@ -36,3 +36,12 @@ export function isStale(iso: string | null | undefined, now = new Date()): boole
 export function venueTitle(v: { name: string | null; branch_name: string | null }) {
   return [v.name, v.branch_name].filter(Boolean).join(" ");
 }
+
+/** 초과 요금 표시: 10분당 1,000원 / 1시간당 6,000원 / 0원이면 '없음' */
+export function formatOvertime(fee: number | null | undefined, unitMinutes: number | null | undefined): string | null {
+  if (fee == null) return null;
+  if (fee === 0) return "없음";
+  const won = `${fee.toLocaleString("ko-KR")}원`;
+  if (!unitMinutes) return won;
+  return `${unitMinutes === 60 ? "1시간" : `${unitMinutes}분`}당 ${won}`;
+}

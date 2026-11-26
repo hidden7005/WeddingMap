@@ -11,3 +11,11 @@ test("예식 시간 입력 해석", () => {
   assert.deepEqual(parseTimes("11:00 abc 25:00").invalid, ["abc", "25:00"]);
   assert.deepEqual(parseTimes("   ").times, []);
 });
+
+import { formatOvertime } from "./format";
+test("초과 요금 표시", () => {
+  assert.equal(formatOvertime(1000, 10), "10분당 1,000원");
+  assert.equal(formatOvertime(6000, 60), "1시간당 6,000원");
+  assert.equal(formatOvertime(0, null), "없음");
+  assert.equal(formatOvertime(null, 10), null);
+});

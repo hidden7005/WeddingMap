@@ -15,9 +15,9 @@ import {
   formatDate,
   formatMinutes,
   formatTime,
-  formatWon,
   isStale,
   venueTitle,
+  formatOvertime,
 } from "@/lib/format";
 import type { VenuePin } from "@/lib/sites";
 import VenueNotes from "./VenueNotes";
@@ -392,10 +392,7 @@ function ParkingTab({
     venue.overtime_fee != null ||
     !!venue.parking_notes;
 
-  const overtime =
-    venue.overtime_fee != null
-      ? `${formatWon(venue.overtime_fee)}${venue.overtime_unit_minutes ? ` / ${formatMinutes(venue.overtime_unit_minutes)}` : ""}`
-      : null;
+  const overtime = formatOvertime(venue.overtime_fee, venue.overtime_unit_minutes);
 
   return (
     <>

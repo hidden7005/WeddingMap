@@ -333,7 +333,7 @@ export function ParkingEditor({
 }) {
   const [free, setFree] = useState<number | null>(venue.guest_free_minutes);
   const [unit, setUnit] = useState<number>(
-    venue.overtime_unit_minutes === 60 ? 60 : 30,
+    venue.overtime_unit_minutes ?? 10,
   );
   const [fee, setFee] = useState(
     venue.overtime_fee != null ? String(venue.overtime_fee) : "",
@@ -384,7 +384,7 @@ export function ParkingEditor({
       <Field label="초과 요금" hint="비워두면 '미입력'으로 표시돼요">
         <div className="flex items-center gap-2">
           <div className="flex shrink-0 rounded-xl border border-slate-200 bg-white p-0.5">
-            {[30, 60].map((u) => (
+            {[10, 15, 30, 60].map((u) => (
               <button
                 key={u}
                 type="button"
@@ -392,7 +392,7 @@ export function ParkingEditor({
                 aria-pressed={unit === u}
                 className={`h-9 rounded-lg px-3 text-sm font-semibold ${unit === u ? "bg-slate-900 text-white" : "text-slate-500"}`}
               >
-                {u === 30 ? "30분당" : "1시간당"}
+                {u === 60 ? "1시간당" : `${u}분당`}
               </button>
             ))}
           </div>
