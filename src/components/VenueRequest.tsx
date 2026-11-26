@@ -314,3 +314,47 @@ export function VenueDeleteRequest({
     </span>
   );
 }
+
+/** 관리자 전용: 예식장 이름 바로 옆 [이름 수정] [삭제] (삭제는 바로 지움, 사본은 DB 백업에) */
+export function AdminVenueActions({
+  venueId,
+  venueName,
+  onRenamed,
+  onDeleted,
+}: {
+  venueId: string;
+  venueName: string;
+  onRenamed: () => void;
+  onDeleted: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  async function rename() {
+    const next = window.prompt("예식장 이름", venueName)?.trim();
+    if (!next || next === venueName) return;
+    setBusy(true);
+    const { error } = await supabase.from("venues").update({ name: next, branch_name: null }).eq("id", venueId);
+    setBusy(false);
+    if (error) return alert("이름을 바꾸지 못했어요: " + error.message);
+    onRenamed();
+  }
+  async function remove() {
+    if (!confirm(`‘${venueName}’ 을(를) 지도에서 삭제할까요?\n홀·시간표·특이사항도 함께 지워져요.`)) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("admin_remove_venue", { p_venue_id: venueId });
+    setBusy(false);
+    if (error) return alert("삭제하지 못했어요: " + error.message);
+    onDeleted();
+  }
+
+  return (
+    <span className="flex shrink-0 gap-2 text-xs font-normal tracking-normal">
+      <button onClick={rename} disabled={busy} className="text-slate-500 underline underline-offset-2 hover:text-slate-800">
+        이름 수정
+      </button>
+      <button onClick={remove} disabled={busy} className="text-rose-600 underline underline-offset-2 hover:text-rose-800">
+        삭제
+      </button>
+    </span>
+  );
+}

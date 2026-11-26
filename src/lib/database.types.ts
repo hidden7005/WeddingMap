@@ -122,6 +122,7 @@ export type Database = {
           hall_type: string | null
           id: string
           interval_minutes: number | null
+          is_outdoor: boolean
           name: string
           sort_order: number
           updated_at: string
@@ -135,6 +136,7 @@ export type Database = {
           hall_type?: string | null
           id?: string
           interval_minutes?: number | null
+          is_outdoor?: boolean
           name: string
           sort_order?: number
           updated_at?: string
@@ -148,6 +150,7 @@ export type Database = {
           hall_type?: string | null
           id?: string
           interval_minutes?: number | null
+          is_outdoor?: boolean
           name?: string
           sort_order?: number
           updated_at?: string
@@ -572,6 +575,7 @@ export type Database = {
     Functions: {
       _edit_ignored_columns: { Args: never; Returns: string[] }
       admin_delete_venue: { Args: { p_request_id: string }; Returns: string }
+      admin_remove_venue: { Args: { p_venue_id: string }; Returns: string }
       admin_stats: { Args: never; Returns: Json }
       can_view: { Args: never; Returns: boolean }
       record_visit: { Args: { p_visitor: string }; Returns: undefined }

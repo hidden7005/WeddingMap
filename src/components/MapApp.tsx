@@ -136,6 +136,10 @@ export default function MapApp() {
         siblings={selectedSite.venues}
         onSelectVenue={(id) => selectVenue(id)}
         onClose={requestClose}
+        onVenueChanged={(deleted) => {
+          if (deleted) clearSelection();
+          load();
+        }}
       />
     ) : (
       <div>

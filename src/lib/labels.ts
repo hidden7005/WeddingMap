@@ -43,8 +43,6 @@ export const FLASH_POLICY: Record<string, string> = {
 export const HALL_TYPE: Record<string, string> = {
   separate: "분리",
   simultaneous: "동시",
-  standalone: "단독",
-  outdoor: "야외",
 };
 
 export const DAY_TYPE: Record<string, string> = {

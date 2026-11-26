@@ -114,14 +114,12 @@ export function HallEditor({
 }) {
   const [name, setName] = useState(hall?.name ?? "");
   const [floor, setFloor] = useState(hall?.floor ?? "");
+  const [outdoor, setOutdoor] = useState(hall?.is_outdoor ?? false);
   const [hallType, setHallType] = useState<string | null>(
     hall?.hall_type ?? null,
   );
   const [timesText, setTimesText] = useState(
     initialTimes.map(formatTime).join(" "),
-  );
-  const [interval, setInterval_] = useState(
-    hall?.interval_minutes != null ? String(hall.interval_minutes) : "",
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,17 +131,15 @@ export function HallEditor({
     if (!name.trim()) return setError("홀 이름을 적어주세요");
     if (parsed.invalid.length)
       return setError(`알아볼 수 없는 시간: ${parsed.invalid.join(", ")}`);
-    const iv = interval.trim() ? Number(interval.replace(/[^\d]/g, "")) : null;
-    if (iv != null && (iv < 10 || iv > 600))
-      return setError("예식 간격은 10~600분 사이로 적어주세요");
     setBusy(true);
     setError(null);
     const row = {
       name: name.trim(),
       floor: floor.trim() || null,
       hall_type: hallType,
-      // 시작 시간을 적으면 간격은 시간에서 계산하므로 비움
-      interval_minutes: parsed.times.length ? null : iv,
+      is_outdoor: outdoor,
+      // 시작 시간을 적으면 예전 '예식 간격' 값은 필요 없으므로 비움 (시간이 없으면 그대로 둠)
+      ...(parsed.times.length ? { interval_minutes: null } : {}),
     };
     let hallId = hall?.id;
     if (hallId) {
@@ -235,9 +231,9 @@ export function HallEditor({
       </div>
       <Field
         label="예식 형태"
-        hint="분리: 예식홀과 식사 연회장이 나뉨 · 동시: 한 공간에서 예식과 식사를 함께"
+        hint="분리: 예식홀과 식사 연회장이 나뉨 · 동시: 한 공간에서 예식과 식사를 함께 · 야외는 함께 고를 수 있어요"
       >
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {Object.entries(HALL_TYPE).map(([k, v]) => (
             <Chip
               key={k}
@@ -247,6 +243,11 @@ export function HallEditor({
               {v}
             </Chip>
           ))}
+          <span className="mx-1 h-5 w-px bg-slate-200" aria-hidden />
+          {/* 야외는 분리/동시와 함께 고를 수 있음 */}
+          <Chip on={outdoor} onClick={() => setOutdoor(!outdoor)}>
+            야외
+          </Chip>
         </div>
       </Field>
       <Field
@@ -277,23 +278,6 @@ export function HallEditor({
             알아볼 수 없는 시간: {parsed.invalid.join(", ")}
           </p>
         )}
-      </Field>
-      <Field
-        label="예식 간격 (분)"
-        hint={
-          parsed.times.length
-            ? "시작 시간을 적으면 간격은 자동으로 계산돼요"
-            : "시작 시간을 모를 때만 적어주세요 (예: 90)"
-        }
-      >
-        <input
-          value={parsed.times.length ? "" : interval}
-          onChange={(e) => setInterval_(e.target.value)}
-          disabled={parsed.times.length > 0}
-          inputMode="numeric"
-          className={`${inputCls} w-28 disabled:bg-slate-100`}
-          placeholder="90"
-        />
       </Field>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Actions

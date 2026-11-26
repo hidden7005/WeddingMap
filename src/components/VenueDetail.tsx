@@ -21,7 +21,7 @@ import {
 } from "@/lib/format";
 import type { VenuePin } from "@/lib/sites";
 import VenueNotes from "./VenueNotes";
-import { VenueDeleteRequest } from "./VenueRequest";
+import { AdminVenueActions, VenueDeleteRequest } from "./VenueRequest";
 import { HallEditor, ParkingEditor } from "./VenueEdit";
 import { useAuth } from "./AuthProvider";
 
@@ -84,12 +84,15 @@ export default function VenueDetail({
   siblings,
   onSelectVenue,
   onClose,
+  onVenueChanged,
 }: {
   venueId: string;
   /** 같은 주소의 다른 예식장 */
   siblings: VenuePin[];
   onSelectVenue: (id: string) => void;
   onClose: () => void;
+  /** 관리자가 이름을 바꾸거나(false) 지웠을 때(true) — 지도 핀 다시 불러오기 */
+  onVenueChanged?: (deleted?: boolean) => void;
 }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -174,10 +177,22 @@ export default function VenueDetail({
               <h2 className="text-[20px] leading-snug font-bold tracking-[-0.02em] text-slate-900">
                 {venueTitle(venue)}
               </h2>
-              <VenueDeleteRequest
-                venueId={venue.id}
-                venueName={venueTitle(venue)}
-              />
+              {auth.member?.role === "admin" ? (
+                <AdminVenueActions
+                  venueId={venue.id}
+                  venueName={venueTitle(venue)}
+                  onRenamed={() => {
+                    refresh();
+                    onVenueChanged?.();
+                  }}
+                  onDeleted={() => onVenueChanged?.(true)}
+                />
+              ) : (
+                <VenueDeleteRequest
+                  venueId={venue.id}
+                  venueName={venueTitle(venue)}
+                />
+              )}
             </div>
             <p className="mt-0.5 text-sm text-slate-600">
               {venue.road_address}
@@ -558,7 +573,7 @@ function HallsTab({
             ) : (
               <>
                 <p className="text-sm text-slate-500">
-                  {[floorLabel(h.floor), label(HALL_TYPE, h.hall_type)]
+                  {[floorLabel(h.floor), label(HALL_TYPE, h.hall_type), h.is_outdoor ? "야외" : null]
                     .filter(Boolean)
                     .join(" · ") || "층·형태 미입력"}
                 </p>
