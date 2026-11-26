@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Tables } from "@/lib/database.types";
-import { GUEST_FREE_METHOD, HALL_TYPE, PARKING_CAPACITY } from "@/lib/labels";
+import { GUEST_FREE_METHOD, HALL_TYPE } from "@/lib/labels";
 import { formatMinutes, formatTime } from "@/lib/format";
 import { parseTimes } from "@/lib/times";
 
@@ -120,6 +120,9 @@ export function HallEditor({
   const [timesText, setTimesText] = useState(
     initialTimes.map(formatTime).join(" "),
   );
+  const [interval, setInterval_] = useState(
+    hall?.interval_minutes != null ? String(hall.interval_minutes) : "",
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -130,12 +133,17 @@ export function HallEditor({
     if (!name.trim()) return setError("홀 이름을 적어주세요");
     if (parsed.invalid.length)
       return setError(`알아볼 수 없는 시간: ${parsed.invalid.join(", ")}`);
+    const iv = interval.trim() ? Number(interval.replace(/[^\d]/g, "")) : null;
+    if (iv != null && (iv < 10 || iv > 600))
+      return setError("예식 간격은 10~600분 사이로 적어주세요");
     setBusy(true);
     setError(null);
     const row = {
       name: name.trim(),
       floor: floor.trim() || null,
       hall_type: hallType,
+      // 시작 시간을 적으면 간격은 시간에서 계산하므로 비움
+      interval_minutes: parsed.times.length ? null : iv,
     };
     let hallId = hall?.id;
     if (hallId) {
@@ -171,15 +179,13 @@ export function HallEditor({
       if (error) return (setBusy(false), setError(friendly(error)));
     }
     if (added.length) {
-      const { error } = await supabase
-        .from("hall_schedules")
-        .insert(
-          added.map((t) => ({
-            hall_id: hallId!,
-            start_time: t,
-            day_type: "common",
-          })),
-        );
+      const { error } = await supabase.from("hall_schedules").insert(
+        added.map((t) => ({
+          hall_id: hallId!,
+          start_time: t,
+          day_type: "common",
+        })),
+      );
       if (error) return (setBusy(false), setError(friendly(error)));
     }
     setBusy(false);
@@ -227,7 +233,10 @@ export function HallEditor({
           />
         </Field>
       </div>
-      <Field label="예식 형태">
+      <Field
+        label="예식 형태"
+        hint="분리: 예식홀과 식사 연회장이 나뉨 · 동시: 한 공간에서 예식과 식사를 함께"
+      >
         <div className="flex flex-wrap gap-1.5">
           {Object.entries(HALL_TYPE).map(([k, v]) => (
             <Chip
@@ -268,6 +277,23 @@ export function HallEditor({
             알아볼 수 없는 시간: {parsed.invalid.join(", ")}
           </p>
         )}
+      </Field>
+      <Field
+        label="예식 간격 (분)"
+        hint={
+          parsed.times.length
+            ? "시작 시간을 적으면 간격은 자동으로 계산돼요"
+            : "시작 시간을 모를 때만 적어주세요 (예: 90)"
+        }
+      >
+        <input
+          value={parsed.times.length ? "" : interval}
+          onChange={(e) => setInterval_(e.target.value)}
+          disabled={parsed.times.length > 0}
+          inputMode="numeric"
+          className={`${inputCls} w-28 disabled:bg-slate-100`}
+          placeholder="90"
+        />
       </Field>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Actions
@@ -315,9 +341,6 @@ export function ParkingEditor({
   const [methods, setMethods] = useState<string[]>(
     venue.guest_free_methods ?? [],
   );
-  const [capacity, setCapacity] = useState<string | null>(
-    venue.parking_capacity,
-  );
   const [notes, setNotes] = useState(venue.parking_notes ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -335,7 +358,6 @@ export function ParkingEditor({
         overtime_fee: feeNumber ? Number(feeNumber) : null,
         overtime_unit_minutes: feeNumber ? unit : null,
         guest_free_methods: methods.length ? methods : null,
-        parking_capacity: capacity,
         parking_notes: notes.trim() || null,
       })
       .eq("id", venue.id);
@@ -413,28 +435,17 @@ export function ParkingEditor({
         </div>
       </Field>
 
-      <Field label="주차 규모">
-        <div className="flex flex-wrap gap-1.5">
-          {Object.entries(PARKING_CAPACITY).map(([k, v]) => (
-            <Chip
-              key={k}
-              on={capacity === k}
-              onClick={() => setCapacity(capacity === k ? null : k)}
-            >
-              {v}
-            </Chip>
-          ))}
-        </div>
-      </Field>
-
-      <Field label="메모">
+      <Field
+        label="위치·요금"
+        hint="몇 대 주차 가능 같은 정보는 적지 않아도 돼요"
+      >
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           maxLength={500}
           rows={2}
           className={`${inputCls} h-auto py-2.5`}
-          placeholder="예: 지하 2~4층, 주말엔 만차 잦음"
+          placeholder="예: 건물 지하 2~4층 / 발렛 30,000원"
         />
       </Field>
 

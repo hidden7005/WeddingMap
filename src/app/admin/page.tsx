@@ -211,6 +211,7 @@ const FIELD_LABEL: Record<string, string> = {
   walk_minutes: "도보(분)",
   memo: "메모",
   schedule_note: "예식 안내",
+  interval_minutes: "예식 간격(분)",
 };
 const TABLE_LABEL: Record<string, string> = { venues: "예식장", halls: "홀", hall_schedules: "시간표", nearby_parking: "주변 주차장" };
 const ACTION_LABEL: Record<string, string> = { insert: "추가", update: "수정", delete: "삭제" };

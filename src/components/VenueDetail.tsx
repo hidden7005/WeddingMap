@@ -12,7 +12,6 @@ import {
   GUEST_FREE_METHOD,
   HALL_TYPE,
   OFFICIAL_PHOTO_TIMING,
-  PARKING_CAPACITY,
   isHotel,
   label,
 } from "@/lib/labels";
@@ -444,12 +443,8 @@ function ParkingTab({
                 ?.map((m) => label(GUEST_FREE_METHOD, m))
                 .join(", ")}
             />
-            <Row
-              label="주차 규모"
-              value={label(PARKING_CAPACITY, venue.parking_capacity)}
-            />
             {venue.parking_notes && (
-              <Row label="메모" value={venue.parking_notes} />
+              <Row label="위치·요금" value={venue.parking_notes} />
             )}
           </dl>
         ) : (
@@ -565,7 +560,7 @@ function HallsTab({
     <>
       {anySimultaneous && (
         <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
-          ⚠️ 같은 시간에 다른 홀에서도 예식이 있어요 (동시예식)
+          ⚠️ 같은 시간에 다른 홀에서도 예식이 있어요 (‘겹침’ 표시)
         </p>
       )}
       {halls.map((h) => {
@@ -619,14 +614,9 @@ function HallsTab({
                               <b className="font-semibold">
                                 {formatTime(s.start_time)}
                               </b>
-                              {s.interval_minutes != null && (
-                                <span className="text-[11px] text-slate-500">
-                                  +{s.interval_minutes}분
-                                </span>
-                              )}
                               {s.is_simultaneous && (
                                 <span className="text-[11px] font-semibold">
-                                  동시
+                                  겹침
                                 </span>
                               )}
                             </span>
@@ -636,14 +626,21 @@ function HallsTab({
                     ))}
                   </div>
                 ) : (
-                  !h.schedule_note && (
-                    <p className="mt-2 text-sm text-slate-300">시간표 미입력</p>
-                  )
-                )}
-                {/* 시간표가 있으면 원문 안내는 중복이라 숨기고, 시간표가 없을 때만 보여줌 */}
-                {!byDay.length && h.schedule_note && (
-                  <p className="mt-2 text-xs leading-relaxed whitespace-pre-line text-slate-500">
-                    🕐 {h.schedule_note}
+                  // 시작 시각을 모를 때만 예식 간격
+                  <p className="mt-2 text-sm text-slate-500">
+                    {h.interval_minutes ? (
+                      <>
+                        예식 간격{" "}
+                        <b className="font-semibold text-slate-800">
+                          {h.interval_minutes}분
+                        </b>
+                        <span className="ml-1.5 text-xs text-slate-400">
+                          시작 시간 미확인
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-slate-300">시간표 미입력</span>
+                    )}
                   </p>
                 )}
                 {h.photo_notes && (
@@ -656,9 +653,6 @@ function HallsTab({
           </Section>
         );
       })}
-      <p className="text-[11px] text-slate-400">
-        +N분 = 같은 홀 다음 예식까지 간격
-      </p>
       {addHall}
     </>
   );

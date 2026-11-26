@@ -29,7 +29,6 @@ def lit(v):
 
 def hall_type(name, floor, text):
     if re.search(r"\(야외|^야외|야외가든", floor or ""): return "outdoor"   # "(야외)", "야외", "(야외가든)" — "야외 연계" 는 제외
-    if "채플" in name or "chapel" in name.lower(): return "chapel"
     if re.search(r"동시\s*[·/]\s*분리", text): return None
     if "분리예식" in text: return "separate"
     if "동시예식" in text: return "simultaneous"

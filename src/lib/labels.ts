@@ -39,11 +39,11 @@ export const FLASH_POLICY: Record<string, string> = {
   prohibited: "금지",
 };
 
+/** 분리 = 예식홀과 식사(연회장) 공간이 나뉨, 동시 = 한 공간에서 예식과 식사를 함께 */
 export const HALL_TYPE: Record<string, string> = {
-  standalone: "단독",
   separate: "분리",
   simultaneous: "동시",
-  chapel: "채플",
+  standalone: "단독",
   outdoor: "야외",
 };
 

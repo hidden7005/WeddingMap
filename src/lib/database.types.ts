@@ -121,6 +121,7 @@ export type Database = {
           floor: string | null
           hall_type: string | null
           id: string
+          interval_minutes: number | null
           name: string
           photo_notes: string | null
           schedule_note: string | null
@@ -135,6 +136,7 @@ export type Database = {
           floor?: string | null
           hall_type?: string | null
           id?: string
+          interval_minutes?: number | null
           name: string
           photo_notes?: string | null
           schedule_note?: string | null
@@ -149,6 +151,7 @@ export type Database = {
           floor?: string | null
           hall_type?: string | null
           id?: string
+          interval_minutes?: number | null
           name?: string
           photo_notes?: string | null
           schedule_note?: string | null
