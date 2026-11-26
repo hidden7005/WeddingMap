@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { Linkify } from "@/components/VenueNotes";
 import { removePhotoFiles, venuePhotoFiles } from "@/lib/venuePhotos";
 import type { Tables, Views } from "@/lib/database.types";
 import { isValidMemberCode, parseMemberLines } from "@/lib/members";
@@ -275,7 +276,7 @@ function ActivityTab({ onChanged, pendingCount, goMembers }: { onChanged: () => 
   }, [load]);
 
   async function removeNote(n: NoteRow) {
-    if (!confirm(`${n.author?.nickname ?? "회원"} 의 특이사항을 삭제할까요?\n사진도 함께 삭제돼요.`)) return;
+    if (!confirm(`${n.author?.nickname ?? "회원"} 의 특이사항을 삭제할까요?`)) return;
     const { error } = await supabase.from("venue_notes").delete().eq("id", n.id);
     if (error) return alert("삭제하지 못했어요: " + error.message);
     const files = n.photo_paths.flatMap((p) => [p, thumbPath(p)]);
@@ -328,7 +329,7 @@ function ActivityTab({ onChanged, pendingCount, goMembers }: { onChanged: () => 
                     ))}
                   </div>
                 )}
-                {n.body && <p className="mt-1.5 whitespace-pre-line text-slate-700">{n.body}</p>}
+                {n.body && <p className="mt-1.5 break-words whitespace-pre-line text-slate-700"><Linkify text={n.body} /></p>}
               </li>
             ))}
           </ul>

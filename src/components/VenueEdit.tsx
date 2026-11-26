@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Tables } from "@/lib/database.types";
 import { HALL_TYPE } from "@/lib/labels";
-import { formatMinutes, formatTime } from "@/lib/format";
+import { formatTime } from "@/lib/format";
 import { parseTimes } from "@/lib/times";
 
 /* ───────────────────────── 공통 ───────────────────────── */
@@ -306,8 +306,6 @@ export function HallEditor({
 
 type Venue = Tables<"venues">;
 
-/** 하객 무료 주차 선택지 (분). null = 모름 */
-const FREE_OPTIONS = [0, 30, 60, 90, 120, 150, 180, 240, 300];
 
 export function ParkingEditor({
   venue,
@@ -318,7 +316,11 @@ export function ParkingEditor({
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const [free, setFree] = useState<number | null>(venue.guest_free_minutes);
+  // 하객 무료 주차: [ ]시간 [ ]분 직접 입력, '무료 없음'은 따로 (DB: 0 = 없음, null = 모름)
+  const g = venue.guest_free_minutes;
+  const [noFree, setNoFree] = useState(g === 0);
+  const [freeH, setFreeH] = useState(g ? String(Math.floor(g / 60) || "") : "");
+  const [freeM, setFreeM] = useState(g ? String(g % 60 || "") : "");
   const [unit, setUnit] = useState<number>(
     venue.overtime_unit_minutes ?? 10,
   );
@@ -327,16 +329,18 @@ export function ParkingEditor({
   );
   const [notes, setNotes] = useState(venue.parking_notes ?? "");
   // 기본 10·30·60분 + DB에 들어 있는 단위(예: 5분, 15분)는 그대로 보여줌
-  // DB에 있는 무료 시간(예: 75분)이 버튼에 없으면 버튼을 하나 더 보여줌
-  const freeOptions = [...new Set([...FREE_OPTIONS, ...(venue.guest_free_minutes != null ? [venue.guest_free_minutes] : [])])].sort((a, b) => a - b);
   const unitOptions = [...new Set([10, 30, 60, ...(venue.overtime_unit_minutes ? [venue.overtime_unit_minutes] : [])])].sort((a, b) => a - b);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const feeNumber = fee.replace(/[^\d]/g, "");
+  const digits = (v: string) => v.replace(/[^\d]/g, "").slice(0, 3);
+  const freeTotal = Number(freeH || 0) * 60 + Number(freeM || 0);
+  const free: number | null = noFree ? 0 : freeTotal > 0 ? freeTotal : null;
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!noFree && Number(freeM || 0) >= 60) return setError("분은 59분까지 적어주세요");
     setBusy(true);
     setError(null);
     const { error } = await supabase
@@ -359,16 +363,32 @@ export function ParkingEditor({
       className="space-y-5 rounded-xl border border-slate-300 bg-slate-50 p-4"
     >
       <Field label="하객 무료 주차">
-        <div className="flex flex-wrap gap-1.5">
-          {freeOptions.map((m) => (
-            <Chip
-              key={m}
-              on={free === m}
-              onClick={() => setFree(free === m ? null : m)}
-            >
-              {m === 0 ? "무료 없음" : `${formatMinutes(m)} 무료`}
-            </Chip>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className={`flex items-center gap-1.5 text-[15px] ${noFree ? "opacity-40" : ""}`}>
+            <input
+              value={freeH}
+              onChange={(e) => setFreeH(digits(e.target.value))}
+              disabled={noFree}
+              inputMode="numeric"
+              aria-label="무료 시간"
+              className="h-11 w-16 shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-center text-[15px] outline-none focus:border-slate-500"
+              placeholder="0"
+            />
+            <span className="shrink-0">시간</span>
+            <input
+              value={freeM}
+              onChange={(e) => setFreeM(digits(e.target.value))}
+              disabled={noFree}
+              inputMode="numeric"
+              aria-label="무료 분"
+              className="h-11 w-16 shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-center text-[15px] outline-none focus:border-slate-500"
+              placeholder="0"
+            />
+            <span className="shrink-0">분 무료</span>
+          </div>
+          <Chip on={noFree} onClick={() => setNoFree(!noFree)}>
+            무료 없음
+          </Chip>
         </div>
       </Field>
 

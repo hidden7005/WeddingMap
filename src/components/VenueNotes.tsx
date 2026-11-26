@@ -30,6 +30,7 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
   const [error, setError] = useState<string | null>(null);
   const [notReady, setNotReady] = useState(false);
   const [composing, setComposing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ note: Note; index: number } | null>(null);
 
   const load = useCallback(async () => {
@@ -65,7 +66,7 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
   const isAdmin = member?.role === "admin";
 
   async function remove(n: Note) {
-    if (!confirm("이 특이사항과 사진을 삭제할까요?")) return;
+    if (!confirm("특이사항을 삭제할까요?")) return;
     const { error: e } = await supabase.from("venue_notes").delete().eq("id", n.id);
     if (e) return alert("삭제하지 못했어요.");
     // 글을 지운 뒤 사진 파일 삭제 (반대로 하면 글 삭제 실패 시 사진만 깨짐)
@@ -90,6 +91,20 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
         <ul className="space-y-3">
           {notes.map((n) => (
             <li key={n.id} className="rounded-xl border border-slate-200 p-3">
+              {editingId === n.id ? (
+                <Composer
+                  venueId={venueId}
+                  section={section}
+                  note={n}
+                  urls={urls}
+                  onCancel={() => setEditingId(null)}
+                  onDone={() => {
+                    setEditingId(null);
+                    load();
+                  }}
+                />
+              ) : (
+              <>
               {n.photo_paths.length > 0 && (
                 <div className="mb-2 grid grid-cols-4 gap-1.5">
                   {n.photo_paths.map((p, i) => (
@@ -107,17 +122,24 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
                   ))}
                 </div>
               )}
-              {n.body && <p className="text-sm whitespace-pre-line text-slate-800">{n.body}</p>}
+              {n.body && <p className="text-sm break-words whitespace-pre-line text-slate-800"><Linkify text={n.body} /></p>}
               <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-slate-400">
                 <span>
                   {n.author?.nickname ?? "탈퇴한 회원"} · {formatDate(n.created_at)}
                 </span>
                 {status === "member" && (n.author_id === myId || isAdmin) && (
-                  <button onClick={() => remove(n)} className="rounded px-1.5 py-0.5 text-rose-500 hover:bg-rose-50">
-                    삭제
-                  </button>
+                  <span className="flex gap-1">
+                    <button onClick={() => setEditingId(n.id)} className="rounded px-1.5 py-0.5 text-slate-500 hover:bg-slate-100">
+                      수정
+                    </button>
+                    <button onClick={() => remove(n)} className="rounded px-1.5 py-0.5 text-rose-500 hover:bg-rose-50">
+                      삭제
+                    </button>
+                  </span>
                 )}
               </div>
+              </>
+              )}
             </li>
           ))}
         </ul>
@@ -168,15 +190,21 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
 function Composer({
   venueId,
   section,
+  note,
+  urls,
   onCancel,
   onDone,
 }: {
   venueId: string;
   section: "parking" | "photo";
+  /** 있으면 수정 */
+  note?: Note;
+  urls?: Urls;
   onCancel: () => void;
   onDone: () => void;
 }) {
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState(note?.body ?? "");
+  const [kept, setKept] = useState<string[]>(note?.photo_paths ?? []); // 수정 시 남겨둘 기존 사진
   const [files, setFiles] = useState<{ file: File; preview: string }[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -191,26 +219,32 @@ function Composer({
     if (!list) return;
     setError(null);
     const picked = Array.from(list).filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|heic|webp)$/i.test(f.name));
-    const room = MAX_PHOTOS - files.length;
+    const room = MAX_PHOTOS - kept.length - files.length;
     if (picked.length > room) setError(`사진은 최대 ${MAX_PHOTOS}장까지예요. 앞의 ${room}장만 넣었어요.`);
     setFiles((cur) => [...cur, ...picked.slice(0, room).map((file) => ({ file, preview: URL.createObjectURL(file) }))]);
     if (inputRef.current) inputRef.current.value = "";
   }
 
   async function submit() {
-    if (!body.trim() && files.length === 0) return setError("내용을 쓰거나 사진을 넣어주세요.");
+    if (!body.trim() && kept.length + files.length === 0) return setError("내용을 쓰거나 사진을 넣어주세요.");
     setError(null);
-    const noteId = crypto.randomUUID();
+    const noteId = note?.id ?? crypto.randomUUID();
     const uploaded: string[] = [];
+    // 수정: 뺀 기존 사진, 새 사진은 비어 있는 번호(1~4)에 저장
+    const removed = (note?.photo_paths ?? []).filter((p) => !kept.includes(p));
+    const freeSlots = [1, 2, 3, 4].filter((k) => !kept.includes(photoPath(venueId, noteId, k)));
     try {
-      const paths: string[] = [];
+      const paths: string[] = [...kept];
+      // 다시 쓸 번호에 예전 파일이 남아 있으면 먼저 지움
+      const reuse = removed.filter((p) => freeSlots.slice(0, files.length).some((k) => photoPath(venueId, noteId, k) === p));
+      if (reuse.length) await supabase.storage.from(BUCKET).remove(reuse.flatMap((p) => [p, thumbPath(p)]));
       for (let i = 0; i < files.length; i++) {
         setBusy(`사진 올리는 중 ${i + 1}/${files.length}`);
         const [full, thumb] = await Promise.all([
           resizeToJpeg(files[i].file, PHOTO_MAX_SIDE, 0.82),
           resizeToJpeg(files[i].file, THUMB_MAX_SIDE, 0.75),
         ]);
-        const p = photoPath(venueId, noteId, i + 1);
+        const p = photoPath(venueId, noteId, freeSlots[i]);
         for (const [path, blob] of [
           [p, full],
           [thumbPath(p), thumb],
@@ -222,8 +256,13 @@ function Composer({
         paths.push(p);
       }
       setBusy("저장 중…");
-      const { error: e } = await supabase.from("venue_notes").insert({ id: noteId, venue_id: venueId, section, body: body.trim() || null, photo_paths: paths });
+      const { error: e } = note
+        ? await supabase.from("venue_notes").update({ body: body.trim() || null, photo_paths: paths }).eq("id", note.id)
+        : await supabase.from("venue_notes").insert({ id: noteId, venue_id: venueId, section, body: body.trim() || null, photo_paths: paths });
       if (e) throw e;
+      // 저장이 끝난 뒤 뺀 사진 파일 정리
+      const leftover = removed.filter((p) => !paths.includes(p));
+      if (leftover.length) await supabase.storage.from(BUCKET).remove(leftover.flatMap((p) => [p, thumbPath(p)]));
       onDone();
     } catch (e) {
       if (uploaded.length) await supabase.storage.from(BUCKET).remove(uploaded); // 실패하면 올린 사진 정리
@@ -233,8 +272,25 @@ function Composer({
   }
 
   return (
-    <div className="mb-3 rounded-xl border border-slate-300 p-3">
+    <div className={note ? "" : "mb-3 rounded-xl border border-slate-300 p-3"}>
       <div className="grid grid-cols-4 gap-1.5">
+        {kept.map((p) => (
+          <div key={p} className="relative aspect-square overflow-hidden rounded-lg bg-slate-100">
+            {urls?.[thumbPath(p)] && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={urls[thumbPath(p)]} alt="" className="h-full w-full object-cover" />
+            )}
+            {!busy && (
+              <button
+                onClick={() => setKept((cur) => cur.filter((x) => x !== p))}
+                aria-label="사진 빼기"
+                className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs text-white"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
         {files.map((f, i) => (
           <div key={f.preview} className="relative aspect-square overflow-hidden rounded-lg bg-slate-100">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -253,14 +309,14 @@ function Composer({
             )}
           </div>
         ))}
-        {files.length < MAX_PHOTOS && !busy && (
+        {kept.length + files.length < MAX_PHOTOS && !busy && (
           <button
             onClick={() => inputRef.current?.click()}
             className="flex aspect-square flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 text-slate-400 hover:bg-slate-50"
           >
             <span className="text-xl leading-none">＋</span>
             <span className="mt-1 text-[11px]">
-              사진 {files.length}/{MAX_PHOTOS}
+              사진 {kept.length + files.length}/{MAX_PHOTOS}
             </span>
           </button>
         )}
@@ -269,7 +325,7 @@ function Composer({
         value={body}
         onChange={(e) => setBody(e.target.value.slice(0, MAX_BODY))}
         rows={3}
-        placeholder={section === "parking" ? "예: 지하 2층은 SUV 진입 불가, 주말 오후엔 B1이 금방 차요" : "예: 본식 중 버진로드 진입 금지, 2층 발코니에서 촬영 가능"}
+        placeholder={section === "parking" ? "예: 지하 2층은 SUV 진입 불가, 주말 오후엔 B1이 금방 차요" : "예: 2층 발코니에서 촬영 가능"}
         className="mt-2 w-full resize-none text-sm outline-none placeholder:text-slate-400"
       />
       <input ref={inputRef} type="file" accept="image/*" multiple hidden onChange={(e) => addFiles(e.target.files)} />
@@ -283,11 +339,41 @@ function Composer({
             취소
           </button>
           <button onClick={submit} disabled={!!busy} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-            {busy ?? "올리기"}
+            {busy ?? (note ? "저장" : "올리기")}
           </button>
         </div>
       </div>
     </div>
+  );
+}
+
+/* ───────────────────────── 글 속 링크 ───────────────────────── */
+
+/** http(s)://… 또는 www.… 를 누를 수 있는 링크로 (새 창) */
+export function Linkify({ text }: { text: string }) {
+  const parts = text.split(/((?:https?:\/\/|www\.)[^\s<>"']+)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (i % 2 === 0) return part;
+        const trail = part.match(/[).,!?\]]+$/)?.[0] ?? ""; // 문장 끝 괄호·마침표는 링크에서 뺌
+        const url = trail ? part.slice(0, -trail.length) : part;
+        return (
+          <span key={i}>
+            <a
+              href={url.startsWith("www.") ? `https://${url}` : url}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="text-sky-700 underline underline-offset-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {url}
+            </a>
+            {trail}
+          </span>
+        );
+      })}
+    </>
   );
 }
 
@@ -347,7 +433,7 @@ function Lightbox({ srcs, start, caption, onClose }: { srcs: (string | undefined
           </>
         )}
       </div>
-      {caption && <p className="p-4 text-center text-sm whitespace-pre-line text-white/90">{caption}</p>}
+      {caption && <p className="p-4 text-center text-sm break-words whitespace-pre-line text-white/90" onClick={(e) => e.stopPropagation()}><Linkify text={caption} /></p>}
     </div>,
     document.body,
   );

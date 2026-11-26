@@ -7,7 +7,9 @@ import { groupSites, searchPins, toPins, type Site, type VenuePin } from "@/lib/
 import NaverMap, { type MapFocus } from "./NaverMap";
 import VenueDetail from "./VenueDetail";
 import BottomSheet, { sheetHalfHeight, type SheetSnap } from "./BottomSheet";
-import { SearchInput, VenueList } from "./SearchBox";
+import { venueTitle } from "@/lib/format";
+import { RecentList, SearchInput, VenueList } from "./SearchBox";
+import { addRecent, clearRecent, loadRecent, removeRecent, type RecentItem } from "@/lib/recent";
 import { useMediaQuery } from "./useMediaQuery";
 import UserMenu from "./UserMenu";
 import { useAuth } from "./AuthProvider";
@@ -28,6 +30,8 @@ export default function MapApp() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [recent, setRecent] = useState<RecentItem[]>([]);
+  useEffect(() => setRecent(loadRecent()), []);
   const [selection, setSelection] = useState<Selection>(null);
   const [focus, setFocus] = useState<MapFocus | null>(null);
   const [snap, setSnap] = useState<SheetSnap>("half");
@@ -124,8 +128,28 @@ export default function MapApp() {
   const pickFromSearch = (v: VenuePin) => {
     setSearchOpen(false);
     (document.activeElement as HTMLElement | null)?.blur();
+    if (query.trim()) addRecent({ type: "query", q: query.trim() });
+    setRecent(addRecent({ type: "venue", id: v.id, name: venueTitle(v) }));
     selectVenue(v.id, { pan: true });
   };
+  const submitQuery = () => {
+    if (query.trim()) setRecent(addRecent({ type: "query", q: query.trim() }));
+  };
+  const pickRecent = (it: RecentItem) => {
+    if (it.type === "query") {
+      setQuery(it.q);
+      setSearchOpen(true);
+      setRecent(addRecent(it));
+      return;
+    }
+    const pin = pins?.find((p) => p.id === it.id);
+    if (!pin) return setRecent(removeRecent(it)); // 지도에서 지워진 예식장
+    pickFromSearch(pin);
+  };
+  const showRecent = searchOpen && !query.trim() && recent.length > 0;
+  const recentList = (
+    <RecentList items={recent} onPick={pickRecent} onRemove={(it) => setRecent(removeRecent(it))} onClear={() => setRecent(clearRecent())} />
+  );
 
   /* ── 패널/시트 내용 ── */
   const panelContent = selectedSite ? (
@@ -208,10 +232,17 @@ export default function MapApp() {
               </h1>
               <UserMenu />
             </div>
-            <SearchInput value={query} onChange={(v) => (setQuery(v), setSearchOpen(true))} onFocus={() => setSearchOpen(true)} />
+            <SearchInput value={query} onChange={(v) => (setQuery(v), setSearchOpen(true))} onFocus={() => setSearchOpen(true)} onSubmit={submitQuery} />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {query.trim() && (searchOpen || !panelContent) ? (
+            {showRecent ? (
+              <div className="pb-2">
+                {recentList}
+                <button onClick={() => setSearchOpen(false)} className="w-full py-2 text-center text-xs text-slate-400 hover:text-slate-600">
+                  닫기
+                </button>
+              </div>
+            ) : query.trim() && (searchOpen || !panelContent) ? (
               <VenueList items={results} onSelect={pickFromSearch} empty={<VenueRequestPrompt key={query.trim()} query={query} />} />
             ) : panelContent ? (
               <div className="pt-3">
@@ -256,9 +287,17 @@ export default function MapApp() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-a.png" alt="ANOTHERDAY" className="h-6 w-6" draggable={false} />
           </button>
-          <SearchInput className="min-w-0 flex-1" value={query} onChange={(v) => (setQuery(v), setSearchOpen(true))} onFocus={() => setSearchOpen(true)} />
+          <SearchInput className="min-w-0 flex-1" value={query} onChange={(v) => (setQuery(v), setSearchOpen(true))} onFocus={() => setSearchOpen(true)} onSubmit={submitQuery} />
           <UserMenu compact />
         </div>
+        {showRecent && (
+          <div className="mt-2 max-h-[60dvh] overflow-y-auto rounded-xl bg-white pb-1 shadow-lg">
+            {recentList}
+            <button onClick={() => setSearchOpen(false)} className="w-full py-2 text-center text-xs text-slate-400 hover:text-slate-600">
+              닫기
+            </button>
+          </div>
+        )}
         {searchOpen && query.trim() && (
           <div className="mt-2 max-h-[60dvh] overflow-y-auto rounded-xl bg-white shadow-lg">
             <VenueList items={results} onSelect={pickFromSearch} empty={<VenueRequestPrompt key={query.trim()} query={query} />} />

@@ -228,7 +228,6 @@ export default function VenueDetail({
               rel="noreferrer"
               className="block text-slate-600 underline-offset-2 hover:underline"
             >
-              <span className="inline-block w-14 text-slate-500">web.</span>
               홈페이지 ↗
             </a>
           )}
