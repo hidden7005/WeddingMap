@@ -129,7 +129,10 @@ export default function NaverMap({
     const spreadOffset = (site: Site) => {
       const p = projection.fromCoordToOffset(new naver.maps.LatLng(site.lat, site.lng));
       let dx = 0;
-      while (placed.some((q) => Math.abs(q.x - (p.x + dx)) < 26 && Math.abs(q.y - p.y) < 26)) dx += 30;
+      // 확대했을 때만, 최대 두 칸까지만 벌림 (줄줄이 밀려나지 않게)
+      if (zoom >= UNCLUSTER_ZOOM) {
+        for (let k = 0; k < 2 && placed.some((q) => Math.abs(q.x - (p.x + dx)) < 26 && Math.abs(q.y - p.y) < 26); k++) dx += 30;
+      }
       // 이웃 핀과 이름표가 겹치지 않게: 근처에 핀이 있으면 이름표를 위/아래 번갈아
       const near = placed.filter((q) => Math.abs(q.x - (p.x + dx)) < 120 && Math.abs(q.y - p.y) < 40).length;
       placed.push({ x: p.x + dx, y: p.y });
@@ -171,10 +174,14 @@ export default function NaverMap({
       const p = projection.fromCoordToOffset(new naver.maps.LatLng(s.lat, s.lng));
       return { x: p.x, y: p.y, item: s };
     });
-    for (const c of gridCluster(points, CELL_SIZE)) {
-      if (c.items.length === 1 || c.items.some((s) => s.key === selectedSiteKey)) {
-        // 선택된 지점은 항상 따로 보여줌
-        c.items.forEach(addSiteMarker);
+    for (const cluster of gridCluster(points, CELL_SIZE)) {
+      // 선택된 지점만 따로 핀으로 꺼내고, 나머지는 그대로 묶음 표시
+      const sel = cluster.items.find((s) => s.key === selectedSiteKey);
+      if (sel) addSiteMarker(sel);
+      const c = { items: sel ? cluster.items.filter((s) => s !== sel) : cluster.items };
+      if (!c.items.length) continue;
+      if (c.items.length === 1) {
+        addSiteMarker(c.items[0]);
         continue;
       }
       const venueCount = c.items.reduce((a, s) => a + s.venues.length, 0);
