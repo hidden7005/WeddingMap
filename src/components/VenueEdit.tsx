@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Tables } from "@/lib/database.types";
-import { GUEST_FREE_METHOD, HALL_TYPE } from "@/lib/labels";
+import { HALL_TYPE } from "@/lib/labels";
 import { formatMinutes, formatTime } from "@/lib/format";
 import { parseTimes } from "@/lib/times";
 
@@ -338,9 +338,6 @@ export function ParkingEditor({
   const [fee, setFee] = useState(
     venue.overtime_fee != null ? String(venue.overtime_fee) : "",
   );
-  const [methods, setMethods] = useState<string[]>(
-    venue.guest_free_methods ?? [],
-  );
   const [notes, setNotes] = useState(venue.parking_notes ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -357,7 +354,6 @@ export function ParkingEditor({
         guest_free_minutes: free,
         overtime_fee: feeNumber ? Number(feeNumber) : null,
         overtime_unit_minutes: feeNumber ? unit : null,
-        guest_free_methods: methods.length ? methods : null,
         parking_notes: notes.trim() || null,
       })
       .eq("id", venue.id);
@@ -412,26 +408,6 @@ export function ParkingEditor({
               원
             </span>
           </div>
-        </div>
-      </Field>
-
-      <Field label="무료 처리 방법" hint="여러 개 고를 수 있어요">
-        <div className="flex flex-wrap gap-1.5">
-          {Object.entries(GUEST_FREE_METHOD).map(([k, v]) => (
-            <Chip
-              key={k}
-              on={methods.includes(k)}
-              onClick={() =>
-                setMethods(
-                  methods.includes(k)
-                    ? methods.filter((x) => x !== k)
-                    : [...methods, k],
-                )
-              }
-            >
-              {v}
-            </Chip>
-          ))}
         </div>
       </Field>
 

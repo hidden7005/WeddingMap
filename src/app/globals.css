@@ -114,3 +114,10 @@ body {
 .wm-pin-label-above {
   top: -24px;
 }
+
+/* 누를 수 있는 것은 손가락 커서 (Tailwind 4 는 버튼 기본 커서가 화살표) */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary {
+  cursor: pointer;
+}

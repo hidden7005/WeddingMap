@@ -7,11 +7,7 @@ import {
   CATEGORY,
   DAY_TYPE,
   DAY_TYPE_ORDER,
-  EXTERNAL_SNAP_POLICY,
-  FLASH_POLICY,
-  GUEST_FREE_METHOD,
   HALL_TYPE,
-  OFFICIAL_PHOTO_TIMING,
   isHotel,
   label,
 } from "@/lib/labels";
@@ -28,6 +24,7 @@ import VenueNotes from "./VenueNotes";
 import { VenueDeleteRequest } from "./VenueRequest";
 import { HallEditor, ParkingEditor } from "./VenueEdit";
 import { useAuth } from "./AuthProvider";
+import { formatTel } from "@/lib/phone";
 
 type Editor = { editor: { nickname: string } | null };
 type Venue = Tables<"venues"> & Editor;
@@ -174,9 +171,15 @@ export default function VenueDetail({
                   : ""}
               </span>
             </p>
-            <h2 className="mt-1.5 text-[20px] leading-snug font-bold tracking-[-0.02em] text-slate-900">
-              {venueTitle(venue)}
-            </h2>
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2">
+              <h2 className="text-[20px] leading-snug font-bold tracking-[-0.02em] text-slate-900">
+                {venueTitle(venue)}
+              </h2>
+              <VenueDeleteRequest
+                venueId={venue.id}
+                venueName={venueTitle(venue)}
+              />
+            </div>
             <p className="mt-0.5 text-sm text-slate-600">
               {venue.road_address}
               {venue.floor ? ` ${venue.floor}층` : ""}
@@ -204,10 +207,10 @@ export default function VenueDetail({
             <p>
               <span className="inline-block w-14 text-slate-500">phone.</span>
               <a
-                href={`tel:${venue.phone}`}
+                href={`tel:${venue.phone.replace(/[^\d+]/g, "")}`}
                 className="text-slate-600 underline-offset-2 hover:underline"
               >
-                {venue.phone}
+                {formatTel(venue.phone)}
               </a>
             </p>
           )}
@@ -291,7 +294,6 @@ export default function VenueDetail({
             마지막 수정 {venue.editor.nickname} · {formatDate(venue.updated_at)}
           </p>
         )}
-        <VenueDeleteRequest venueId={venue.id} venueName={venueTitle(venue)} />
       </div>
     </div>
   );
@@ -432,12 +434,6 @@ function ParkingTab({
               value={formatMinutes(venue.guest_free_minutes)}
             />
             <Row label="초과 요금" value={overtime} />
-            <Row
-              label="무료 처리 방법"
-              value={venue.guest_free_methods
-                ?.map((m) => label(GUEST_FREE_METHOD, m))
-                .join(", ")}
-            />
             {venue.parking_notes && (
               <Row label="위치·요금" value={venue.parking_notes} />
             )}
@@ -445,6 +441,10 @@ function ParkingTab({
         ) : (
           <Empty>아직 입력된 주차 정보가 없어요</Empty>
         )}
+      </Section>
+
+      <Section title="주차 특이사항">
+        <VenueNotes venueId={venue.id} section="parking" />
       </Section>
 
       <Section
@@ -482,10 +482,6 @@ function ParkingTab({
         ) : (
           <Empty>등록된 주변 주차장이 없어요</Empty>
         )}
-      </Section>
-
-      <Section title="주차 특이사항">
-        <VenueNotes venueId={venue.id} section="parking" />
       </Section>
     </>
   );
@@ -665,69 +661,9 @@ function HallsTab({
 /* ───────────────────────── 촬영 ───────────────────────── */
 
 function PhotoTab({ venue }: { venue: Venue }) {
-  const hasInfo =
-    venue.official_vendor_designated != null ||
-    venue.external_snap_policy != null ||
-    venue.official_photo_timing != null ||
-    venue.flash_policy != null ||
-    venue.external_vendor_fee != null ||
-    venue.pass_required != null ||
-    !!venue.equipment_route ||
-    !!venue.bridal_room_info;
-
-  const designated =
-    venue.official_vendor_designated == null
-      ? null
-      : venue.official_vendor_designated
-        ? `있음${venue.official_vendor_name ? ` (${venue.official_vendor_name})` : ""}`
-        : "없음";
-
   return (
-    <>
-      <Section title="촬영 규정" checkedAt={venue.photo_checked_at}>
-        {hasInfo ? (
-          <dl className="divide-y divide-slate-100">
-            <Row label="원판 지정 업체" value={designated} />
-            <Row
-              label="외부 스냅"
-              value={label(EXTERNAL_SNAP_POLICY, venue.external_snap_policy)}
-            />
-            <Row
-              label="원판 촬영 시점"
-              value={label(OFFICIAL_PHOTO_TIMING, venue.official_photo_timing)}
-            />
-            <Row
-              label="플래시"
-              value={label(FLASH_POLICY, venue.flash_policy)}
-            />
-            <Row
-              label="외부 업체 등록비"
-              value={formatWon(venue.external_vendor_fee)}
-            />
-            <Row
-              label="출입증"
-              value={
-                venue.pass_required == null
-                  ? null
-                  : venue.pass_required
-                    ? "필요"
-                    : "불필요"
-              }
-            />
-            <Row label="장비 반입 동선" value={venue.equipment_route} />
-            <Row label="신부대기실" value={venue.bridal_room_info} />
-            {venue.photo_notes && (
-              <Row label="메모" value={venue.photo_notes} />
-            )}
-          </dl>
-        ) : (
-          <Empty>아직 입력된 촬영 규정이 없어요</Empty>
-        )}
-      </Section>
-
-      <Section title="촬영 특이사항">
-        <VenueNotes venueId={venue.id} section="photo" />
-      </Section>
-    </>
+    <Section title="촬영 특이사항">
+      <VenueNotes venueId={venue.id} section="photo" />
+    </Section>
   );
 }

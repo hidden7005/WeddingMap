@@ -98,16 +98,7 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
             <span className="text-lg leading-none">＋</span> 특이사항 쓰기 (사진 최대 4장)
           </button>
         )
-      ) : (
-        status === "guest" && (
-          <p className="mb-3 rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">
-            <Link href="/login" className="font-semibold underline">
-              로그인
-            </Link>
-            한 회원은 특이사항과 사진을 올릴 수 있어요.
-          </p>
-        )
-      )}
+      ) : null}
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
       {!notes ? (
@@ -151,6 +142,14 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
         </ul>
       )}
 
+      {status === "guest" && (
+        <p className="mt-3 rounded-xl bg-slate-50 p-3 text-center text-xs text-slate-500">
+          <Link href="/login" className="font-semibold underline">
+            로그인
+          </Link>
+          한 회원은 특이사항과 사진을 올릴 수 있어요.
+        </p>
+      )}
       {viewer && (
         <Lightbox
           srcs={viewer.note.photo_paths.map((p) => urls[p] ?? urls[thumbPath(p)])}

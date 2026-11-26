@@ -27,3 +27,23 @@ export function formatPhone(stored: string | null | undefined): string {
 export function toDomestic(stored: string): string {
   return "0" + normalizePhone(stored).replace(/^82/, "");
 }
+
+/**
+ * 예식장 전화번호 표시: 항상 하이픈 (02-542-1877, 031-123-4567, 1588-1234, 0507-1234-5678)
+ * 이미 하이픈이 있거나 알 수 없는 형식이면 숫자만 보고 다시 나눔, 못 나누면 원문
+ */
+export function formatTel(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const d = raw.replace(/\D/g, "");
+  if (/^1[5-9]\d{6}$/.test(d)) return `${d.slice(0, 4)}-${d.slice(4)}`; // 1588-1234
+  if (d.startsWith("02")) {
+    if (d.length === 9) return `02-${d.slice(2, 5)}-${d.slice(5)}`;
+    if (d.length === 10) return `02-${d.slice(2, 6)}-${d.slice(6)}`;
+  }
+  if (/^050\d/.test(d) && d.length === 12) return `${d.slice(0, 4)}-${d.slice(4, 8)}-${d.slice(8)}`; // 0507-1234-5678
+  if (d.startsWith("0") && (d.length === 10 || d.length === 11)) {
+    const rest = d.slice(3);
+    return `${d.slice(0, 3)}-${rest.slice(0, rest.length - 4)}-${rest.slice(-4)}`;
+  }
+  return raw.trim();
+}

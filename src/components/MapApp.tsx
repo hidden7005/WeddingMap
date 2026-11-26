@@ -308,7 +308,7 @@ function Intro({ count }: { count?: number }) {
   return (
     <div className="p-5 text-sm text-slate-600">
       <p className="text-2xl font-extrabold text-slate-900">{count != null ? `${count.toLocaleString()}곳` : "…"}</p>
-      <p className="mt-1">전국 예식장의 주차, 홀 시간표, 촬영 규정을 확인하세요.</p>
+      <p className="mt-1">전국 예식장의 촬영 규정, 홀 시간표, 주차를 확인하세요.</p>
       <ul className="mt-5 space-y-2 text-slate-500">
         <li>🔍 위 검색창에 예식장 이름이나 지역을 입력하거나</li>
         <li>🗺️ 지도에서 마커를 눌러 상세 정보를 볼 수 있어요.</li>
