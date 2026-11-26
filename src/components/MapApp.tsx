@@ -95,6 +95,9 @@ export default function MapApp() {
 
   const selectSite = useCallback(
     (site: Site) => {
+      // 지도에서 핀을 직접 누르면 이전 검색은 닫음
+      setQuery("");
+      setSearchOpen(false);
       if (site.venues.length === 1) return selectVenue(site.venues[0].id);
       setSelection((prev) => {
         if (!prev) setSnap("half");
