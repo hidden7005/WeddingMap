@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { removePhotoFiles, venuePhotoFiles } from "@/lib/venuePhotos";
 import type { Tables, Views } from "@/lib/database.types";
 import { isValidMemberCode, parseMemberLines } from "@/lib/members";
 import { formatDate, venueTitle } from "@/lib/format";
@@ -275,10 +276,10 @@ function ActivityTab({ onChanged, pendingCount, goMembers }: { onChanged: () => 
 
   async function removeNote(n: NoteRow) {
     if (!confirm(`${n.author?.nickname ?? "회원"} 의 특이사항을 삭제할까요?\n사진도 함께 삭제돼요.`)) return;
-    const files = n.photo_paths.flatMap((p) => [p, thumbPath(p)]);
-    if (files.length) await supabase.storage.from("venue-photos").remove(files);
     const { error } = await supabase.from("venue_notes").delete().eq("id", n.id);
     if (error) return alert("삭제하지 못했어요: " + error.message);
+    const files = n.photo_paths.flatMap((p) => [p, thumbPath(p)]);
+    if (files.length) await supabase.storage.from("venue-photos").remove(files);
     load();
     onChanged();
   }
@@ -580,6 +581,7 @@ function AddMembers({ existing, onAdded }: { existing: Member[]; onAdded: () => 
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [resultError, setResultError] = useState<string | null>(null);
   const parsed = useMemo(() => parseMemberLines(text), [text]);
   const existingEmails = useMemo(() => new Set(existing.map((m) => m.email).filter(Boolean)), [existing]);
   const fresh = parsed.members.filter((m) => !existingEmails.has(m.email));
@@ -589,12 +591,13 @@ function AddMembers({ existing, onAdded }: { existing: Member[]; onAdded: () => 
     if (!fresh.length) return;
     setBusy(true);
     setResult(null);
+    setResultError(null);
     const now = new Date().toISOString();
     const { error } = await supabase
       .from("members")
       .insert(fresh.map((m) => ({ name: m.name, email: m.email, member_code: m.code, team: m.team, approved_at: now })));
     setBusy(false);
-    if (error) return setResult(error.code === "23505" ? "이미 등록된 이메일·아이디가 섞여 있어요. 확인 후 다시 시도해주세요." : "등록하지 못했어요: " + error.message);
+    if (error) return setResultError(error.code === "23505" ? "이미 등록된 이메일·아이디가 섞여 있어요. 확인 후 다시 시도해주세요." : "등록하지 못했어요: " + error.message);
     setResult(`${fresh.length}명을 승인 상태로 등록했어요. 이제 이 이메일로 로그인할 수 있어요.`);
     setText("");
     onAdded();
@@ -604,7 +607,7 @@ function AddMembers({ existing, onAdded }: { existing: Member[]; onAdded: () => 
     <section className="rounded-xl border border-slate-200 p-4">
       <h2 className="font-bold">회원 직접 등록</h2>
       <p className="mt-1 text-sm text-slate-500">
-        한 줄에 한 명씩 <b>아이디, 이메일</b>을 입력하세요 (휴대폰 번호는 있으면 함께 저장). 여기 등록한 사람은 <b>바로 승인</b>돼요. 엑셀에서 열을 복사해
+        한 줄에 한 명씩 <b>아이디, 이메일</b>을 입력하세요 . 여기 등록한 사람은 <b>바로 승인</b>돼요. 엑셀에서 열을 복사해
         붙여넣거나 CSV 파일을 올려도 돼요.
       </p>
       <textarea
@@ -647,6 +650,7 @@ function AddMembers({ existing, onAdded }: { existing: Member[]; onAdded: () => 
         </ul>
       )}
       {result && <p className="mt-2 text-sm text-emerald-700">{result}</p>}
+      {resultError && <p className="mt-2 text-sm text-rose-600">{resultError}</p>}
     </section>
   );
 }
@@ -780,8 +784,9 @@ function VenueRequests() {
       .from("venue_requests")
       .select("*, requester:profiles!venue_requests_requested_by_fkey(nickname)")
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(300);
     if (error) return setMissing(true);
+    // 처리 전 요청은 전부, 처리한 요청은 최근 것만
     setRows(data as RequestRow[]);
   }, []);
   useEffect(() => {
@@ -796,8 +801,11 @@ function VenueRequests() {
   // 삭제 요청: 예식장을 지도에서 바로 지움 (사본은 DB 백업에 남음)
   async function deleteVenue(r: RequestRow) {
     if (!confirm(`‘${r.name}’ 을(를) 지도에서 삭제할까요?\n홀·시간표·특이사항도 함께 지워져요.`)) return;
+    const photos = await venuePhotoFiles(r.venue_id);
     const { data, error } = await supabase.rpc("admin_delete_venue", { p_request_id: r.id });
     if (error) return alert("삭제하지 못했어요: " + error.message);
+    if (data === "deleted") await removePhotoFiles(photos);
+    if (data === "not_pending") alert("이미 처리된 요청이에요.");
     if (data === "already_gone") alert("이미 지도에서 지워진 예식장이에요. 요청만 완료로 바꿨어요.");
     load();
   }

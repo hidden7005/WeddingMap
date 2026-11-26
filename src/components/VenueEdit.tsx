@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Tables } from "@/lib/database.types";
 import { HALL_TYPE } from "@/lib/labels";
@@ -125,6 +125,7 @@ export function HallEditor({
   const [error, setError] = useState<string | null>(null);
 
   const parsed = parseTimes(timesText);
+  const createdHallId = useRef<string | undefined>(undefined);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -141,7 +142,8 @@ export function HallEditor({
       // 시작 시간을 적으면 예전 '예식 간격' 값은 필요 없으므로 비움 (시간이 없으면 그대로 둠)
       ...(parsed.times.length ? { interval_minutes: null } : {}),
     };
-    let hallId = hall?.id;
+    // 새 홀을 만든 뒤 시간 저장에서 실패했다면, 다시 저장할 때는 만든 홀을 고침 (중복 생성 방지)
+    let hallId = hall?.id ?? createdHallId.current;
     if (hallId) {
       const { error } = await supabase
         .from("halls")
@@ -156,6 +158,7 @@ export function HallEditor({
         .single();
       if (error || !data) return (setBusy(false), setError(friendly(error)));
       hallId = data.id;
+      createdHallId.current = data.id;
     }
     // 시간표: 바뀐 것만 지우고 추가 (그대로인 시간은 기록을 남기지 않음)
     const before = new Set(initialTimes.map(formatTime));
@@ -324,6 +327,8 @@ export function ParkingEditor({
   );
   const [notes, setNotes] = useState(venue.parking_notes ?? "");
   // 기본 10·30·60분 + DB에 들어 있는 단위(예: 5분, 15분)는 그대로 보여줌
+  // DB에 있는 무료 시간(예: 75분)이 버튼에 없으면 버튼을 하나 더 보여줌
+  const freeOptions = [...new Set([...FREE_OPTIONS, ...(venue.guest_free_minutes != null ? [venue.guest_free_minutes] : [])])].sort((a, b) => a - b);
   const unitOptions = [...new Set([10, 30, 60, ...(venue.overtime_unit_minutes ? [venue.overtime_unit_minutes] : [])])].sort((a, b) => a - b);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -339,7 +344,7 @@ export function ParkingEditor({
       .update({
         guest_free_minutes: free,
         overtime_fee: feeNumber ? Number(feeNumber) : null,
-        overtime_unit_minutes: feeNumber ? unit : null,
+        overtime_unit_minutes: feeNumber && Number(feeNumber) > 0 ? unit : null,
         parking_notes: notes.trim() || null,
       })
       .eq("id", venue.id);
@@ -355,7 +360,7 @@ export function ParkingEditor({
     >
       <Field label="하객 무료 주차">
         <div className="flex flex-wrap gap-1.5">
-          {FREE_OPTIONS.map((m) => (
+          {freeOptions.map((m) => (
             <Chip
               key={m}
               on={free === m}

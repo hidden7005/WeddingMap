@@ -196,7 +196,7 @@ export default function VenueDetail({
             </div>
             <p className="mt-0.5 text-sm text-slate-600">
               {venue.road_address}
-              {venue.floor ? ` ${venue.floor}층` : ""}
+              {venue.floor ? ` ${floorLabel(venue.floor)}` : ""}
             </p>
           </div>
           <button

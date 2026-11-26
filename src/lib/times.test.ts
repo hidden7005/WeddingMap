@@ -10,6 +10,9 @@ test("예식 시간 입력 해석", () => {
   assert.deepEqual(parseTimes("12 12:30 오후 1시 오전 10시").times, ["10:00", "12:00", "12:30", "13:00"]);
   assert.deepEqual(parseTimes("11:00 abc 25:00").invalid, ["abc", "25:00"]);
   assert.deepEqual(parseTimes("   ").times, []);
+  // 앞에 0을 붙이거나 9시는 오전 그대로
+  assert.deepEqual(parseTimes("09:30 0900 9시 오전 8시").times, ["08:00", "09:00", "09:30"]);
+  assert.deepEqual(parseTimes("1:30 5시").times, ["13:30", "17:00"]);
 });
 
 import { formatOvertime } from "./format";

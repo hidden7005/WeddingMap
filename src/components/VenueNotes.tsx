@@ -66,10 +66,11 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
 
   async function remove(n: Note) {
     if (!confirm("이 특이사항과 사진을 삭제할까요?")) return;
-    const files = n.photo_paths.flatMap((p) => [p, thumbPath(p)]);
-    if (files.length) await supabase.storage.from(BUCKET).remove(files);
     const { error: e } = await supabase.from("venue_notes").delete().eq("id", n.id);
     if (e) return alert("삭제하지 못했어요.");
+    // 글을 지운 뒤 사진 파일 삭제 (반대로 하면 글 삭제 실패 시 사진만 깨짐)
+    const files = n.photo_paths.flatMap((p) => [p, thumbPath(p)]);
+    if (files.length) await supabase.storage.from(BUCKET).remove(files);
     load();
   }
 
@@ -181,7 +182,10 @@ function Composer({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => () => files.forEach((f) => URL.revokeObjectURL(f.preview)), [files]);
+  // 미리보기 주소는 사진을 뺄 때와 창을 닫을 때만 해제 (목록이 바뀔 때마다 해제하면 남은 사진이 깨짐)
+  const filesRef = useRef(files);
+  filesRef.current = files;
+  useEffect(() => () => filesRef.current.forEach((f) => URL.revokeObjectURL(f.preview)), []);
 
   function addFiles(list: FileList | null) {
     if (!list) return;
@@ -237,7 +241,10 @@ function Composer({
             <img src={f.preview} alt="" className="h-full w-full object-cover" />
             {!busy && (
               <button
-                onClick={() => setFiles((cur) => cur.filter((_, j) => j !== i))}
+                onClick={() => {
+                  URL.revokeObjectURL(f.preview);
+                  setFiles((cur) => cur.filter((_, j) => j !== i));
+                }}
                 aria-label="사진 빼기"
                 className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs text-white"
               >

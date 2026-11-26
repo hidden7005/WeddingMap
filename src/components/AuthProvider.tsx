@@ -102,8 +102,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data;
   }, []);
 
-  const check = useCallback(async () => {
-    if (checking.current) return;
+  const rerun = useRef(false);
+  const check = useCallback(async (): Promise<void> => {
+    // 확인 중에 또 요청이 오면 끝난 뒤 한 번 더 확인 (로그인 직후 상태가 늦게 반영되는 것 방지)
+    if (checking.current) {
+      rerun.current = true;
+      return;
+    }
     checking.current = true;
     try {
       const { data: s } = await supabase.auth.getSession();
@@ -119,11 +124,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return error ? null : (data as Status);
       };
       let r = await fetchStatus();
-      if (!r) return; // 네트워크 오류 등은 다음 확인 때 재시도
-      // replaced 라도 "이 기기가 등록한 적 없는 새 로그인"이면 밀려난 게 아니라 방금 로그인한 것
-      // → 이 기기를 등록한다. (로그인 화면의 등록보다 이 확인이 먼저 도는 경우 대비)
-      const freshLogin = r.status === "replaced" && readClaimed() !== sessionIdOf(s.session);
-      if (r.status === "unclaimed" || freshLogin) {
+      if (!r) {
+        // 네트워크 오류: 처음 여는 중이면 일단 비회원 화면으로 열고, 잠시 뒤 다시 확인
+        setStatus((st) => (st === "loading" ? "guest" : st));
+        setTimeout(() => check(), 5000);
+        return;
+      }
+      // 새 로그인인지 밀려난 기기인지는 서버가 판단 (unclaimed = 새 로그인 → 등록)
+      if (r.status === "unclaimed") {
         // 로그인은 됐는데 기기 등록 전 (첫 로그인 직후 등) → 등록 후 다시 확인
         const c = await claim();
         if (c !== "ok") return void (await signOut(NOTICE[c]));
@@ -137,8 +145,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       await signOut(NOTICE[r.status]);
+    } catch {
+      setStatus((st) => (st === "loading" ? "guest" : st));
     } finally {
       checking.current = false;
+      if (rerun.current) {
+        rerun.current = false;
+        setTimeout(() => check(), 0);
+      }
     }
   }, [claim, signOut]);
 

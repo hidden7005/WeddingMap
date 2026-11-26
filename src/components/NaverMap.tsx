@@ -106,11 +106,27 @@ export default function NaverMap({
     const idle = naver.maps.Event.addListener(map, "idle", () => setIdleTick((t) => t + 1));
     const click = naver.maps.Event.addListener(map, "click", () => onMapClickRef.current?.());
     const drag = naver.maps.Event.addListener(map, "dragstart", () => (userMovedRef.current = true));
+    // 손가락·마우스로 지도를 만지면(줌 포함) 첫 위치 이동을 하지 않음
+    const el = containerRef.current;
+    const touched = () => (userMovedRef.current = true);
+    el.addEventListener("wheel", touched, { passive: true });
+    el.addEventListener("touchstart", touched, { passive: true });
     setMapReady(true);
     return () => {
       naver.maps.Event.removeListener([idle, click, drag]);
+      el.removeEventListener("wheel", touched);
+      el.removeEventListener("touchstart", touched);
+      map.destroy();
+      mapRef.current = null;
+      setMapReady(false);
     };
-  }, [scriptReady, showZoomControl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scriptReady]);
+
+  // 확대·축소 버튼은 화면 크기가 바뀌면 옵션만 바꿈 (지도를 다시 만들지 않음)
+  useEffect(() => {
+    mapRef.current?.setOptions({ zoomControl: showZoomControl });
+  }, [showZoomControl, mapReady]);
 
   // 마커 그리기: 화면 안의 지점만, 줌에 따라 클러스터
   const draw = useCallback(() => {

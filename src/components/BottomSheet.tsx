@@ -63,16 +63,24 @@ export default function BottomSheet({
   const half = Math.round(vh * HALF_RATIO);
   const full = vh;
 
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const close = () => {
     if (leaving) return;
     setLeaving(true);
-    setTimeout(() => onClosedRef.current(), 260);
+    closeTimer.current = setTimeout(() => onClosedRef.current(), 260);
   };
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
   const closeRef = useRef(close);
   closeRef.current = close;
 
   useEffect(() => {
     if (closing) closeRef.current();
+    else if (leaving) {
+      // 닫히는 중에 다른 예식장을 고르면 닫기를 취소
+      clearTimeout(closeTimer.current);
+      setLeaving(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [closing]);
 
   // 절반으로 줄일 때는 내용 맨 위로
@@ -231,6 +239,10 @@ export default function BottomSheet({
       </div>
       <div
         ref={scrollRef}
+        onFocusCapture={(e) => {
+          // 입력칸에 들어가면 키보드에 가리지 않게 전체 화면으로
+          if (e.target instanceof HTMLElement && e.target.matches("input, textarea, select")) onSnapChange("full");
+        }}
         className="min-h-0 flex-1 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-contain"
         style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
       >

@@ -62,16 +62,10 @@ def parse_parking(text):
             free = minutes(span)
             if "~" in mf.group(1):
                 notes.append(f"하객 무료 {mf.group(1).strip()}")
-        # 초과 요금: N분당 X원 → 30분당 / 1시간당 으로 환산
+        # 초과 요금: N분당 X원 → 원래 단위 그대로 저장 (환산하지 않음)
         mo = re.search(r"초과\s*(\d+)\s*분당\s*([\d,]+)\s*원", seg)
         if mo and fee is None:
-            per, won = int(mo.group(1)), int(mo.group(2).replace(",", ""))
-            if 30 % per == 0:
-                unit, fee = 30, won * (30 // per)
-            elif 60 % per == 0:
-                unit, fee = 60, won * (60 // per)
-            elif per == 60:
-                unit, fee = 60, won
+            unit, fee = int(mo.group(1)), int(mo.group(2).replace(",", ""))
         # 메모로 남길 것: 위치, 금액(일반·발렛 요금 등). 대수·혼주·버스·확인필요는 버림
         rest = seg
         if mf:

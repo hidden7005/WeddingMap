@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { removePhotoFiles, venuePhotoFiles } from "@/lib/venuePhotos";
 import { isValidMemberCode } from "@/lib/members";
 import { suggestCode, teamLabel } from "@/lib/teams";
 import { useAuth } from "./AuthProvider";
@@ -109,8 +110,11 @@ function Panel({
 }) {
   async function deleteVenue(r: Req) {
     if (!confirm(`‘${r.name}’ 을(를) 지도에서 삭제할까요?\n홀·시간표·특이사항도 함께 지워져요.`)) return;
+    const photos = await venuePhotoFiles(r.venue_id);
     const { data, error } = await supabase.rpc("admin_delete_venue", { p_request_id: r.id });
     if (error) return alert("삭제하지 못했어요: " + error.message);
+    if (data === "deleted") await removePhotoFiles(photos);
+    if (data === "not_pending") alert("이미 처리된 요청이에요.");
     if (data === "already_gone") alert("이미 지도에서 지워진 예식장이에요. 요청만 완료로 바꿨어요.");
     onChanged();
     onVenueDeleted();

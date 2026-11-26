@@ -1,13 +1,14 @@
 /**
  * 예식 시간 입력 해석: "11:00 15:00 18:00", "11시 1시반", "1100, 1530", "11 12:30" 등
  * → 정렬·중복 제거된 "HH:MM" 목록. 해석 못 한 조각은 invalid 로.
- * 숫자만 쓰면 1~9시는 오후로 봄 (예식은 낮~저녁): "1" → 13:00, "11" → 11:00
+ * 앞에 0 없이 쓴 1~8시는 오후로 봄 (예식은 낮~저녁): "1" → 13:00, "11" → 11:00, "09:30" → 09:30
  */
 export function parseTimes(text: string): { times: string[]; invalid: string[] } {
   const out = new Set<string>();
   const invalid: string[] = [];
   const tokens = text
     .replace(/시\s*반/g, "시30분")
+    .replace(/(오전|오후)\s+/g, "$1")
     .split(/[\s,，/·|]+|(?<=분)(?=\d)/)
     .map((t) => t.trim())
     .filter(Boolean);
@@ -32,7 +33,8 @@ function parseOne(tok: string): string | null {
   else if ((mt = s.match(/^(\d{1,2})$/))) (h = +mt[1]), (m = 0);
   else return null;
   if (pm && h < 12) h += 12;
-  else if (!pm && h >= 1 && h <= 9 && !/^오전/.test(tok)) h += 12; // 1~9시는 오후
+  // 앞에 0 없이 쓴 1~8시는 오후로 봄 (예식은 낮~저녁). '09:30', '0930', '9시', '오전 8시'처럼 쓰면 그대로
+  else if (!pm && h >= 1 && h <= 8 && !/^오전/.test(tok) && !/^0/.test(s)) h += 12;
   if (h > 23 || m > 59) return null;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }

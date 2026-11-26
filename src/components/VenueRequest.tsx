@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./AuthProvider";
+import { removePhotoFiles, venuePhotoFiles } from "@/lib/venuePhotos";
 
 /** 검색 결과가 없을 때: 안내 + 식장 등록 요청 버튼 */
 export default function VenueRequestPrompt({ query }: { query: string }) {
@@ -341,9 +342,11 @@ export function AdminVenueActions({
   async function remove() {
     if (!confirm(`‘${venueName}’ 을(를) 지도에서 삭제할까요?\n홀·시간표·특이사항도 함께 지워져요.`)) return;
     setBusy(true);
+    const photos = await venuePhotoFiles(venueId);
     const { error } = await supabase.rpc("admin_remove_venue", { p_venue_id: venueId });
     setBusy(false);
     if (error) return alert("삭제하지 못했어요: " + error.message);
+    await removePhotoFiles(photos);
     onDeleted();
   }
 
