@@ -188,34 +188,43 @@ export type Database = {
       }
       members: {
         Row: {
+          approved_at: string | null
           created_at: string
+          email: string | null
           id: string
           joined_at: string | null
           name: string
           note: string | null
-          phone: string
+          phone: string | null
+          request_note: string | null
           role: string
           status: string
           user_id: string | null
         }
         Insert: {
+          approved_at?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           joined_at?: string | null
           name: string
           note?: string | null
-          phone: string
+          phone?: string | null
+          request_note?: string | null
           role?: string
           status?: string
           user_id?: string | null
         }
         Update: {
+          approved_at?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           joined_at?: string | null
           name?: string
           note?: string | null
-          phone?: string
+          phone?: string | null
+          request_note?: string | null
           role?: string
           status?: string
           user_id?: string | null
@@ -579,7 +588,8 @@ export type Database = {
     Functions: {
       _edit_ignored_columns: { Args: never; Returns: string[] }
       can_view: { Args: never; Returns: boolean }
-      check_member: { Args: { p_name: string; p_phone: string }; Returns: boolean }
+      email_login_status: { Args: { p_email: string }; Returns: string }
+      request_access: { Args: { p_name: string; p_email: string; p_phone?: string; p_note?: string }; Returns: string }
       claim_session: { Args: { p_device?: string; p_user_agent?: string }; Returns: string }
       is_active_member: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }

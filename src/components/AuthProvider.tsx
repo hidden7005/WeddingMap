@@ -35,7 +35,7 @@ const CHECK_INTERVAL_MS = 60_000;
 const NOTICE: Record<string, string> = {
   replaced: "다른 기기에서 로그인되어 이 기기에서는 로그아웃됐어요.",
   suspended: "이용이 정지된 계정이에요. 관리자에게 문의해주세요.",
-  not_member: "회원 명단에 없는 번호예요. 관리자에게 문의해주세요.",
+  not_member: "승인된 회원 계정이 아니에요. 가입 신청 후 관리자 승인을 기다려주세요.",
 };
 
 const CLAIMED_KEY = "wm-claimed-session";

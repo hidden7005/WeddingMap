@@ -5,10 +5,23 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./AuthProvider";
 
+const KAKAO_ENABLED = process.env.NEXT_PUBLIC_KAKAO_LOGIN === "on";
+
 export default function UserMenu({ compact = false }: { compact?: boolean }) {
   const { status, member, session, signOut, refresh, kakaoLinked, linkKakao } = useAuth();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // 관리자: 승인 대기 중인 가입 신청 수
+  useEffect(() => {
+    if (member?.role !== "admin") return;
+    supabase
+      .from("members")
+      .select("id", { count: "exact", head: true })
+      .is("approved_at", null)
+      .then(({ count }) => setPendingCount(count ?? 0));
+  }, [member?.role, open]);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,11 +56,12 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
         aria-expanded={open}
         className={
           compact
-            ? "flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-base font-bold shadow-sm"
-            : "flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold hover:bg-slate-100"
+            ? "relative flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-base font-bold shadow-sm"
+            : "relative flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold hover:bg-slate-100"
         }
         title={member.nickname}
       >
+        {pendingCount > 0 && <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-white bg-rose-600" aria-label="승인 대기 있음" />}
         {compact ? (
           member.nickname.slice(0, 1)
         ) : (
@@ -66,7 +80,7 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
           <button role="menuitem" onClick={() => (setEditing(true), setOpen(false))} className="block w-full px-4 py-2.5 text-left hover:bg-slate-50">
             닉네임 변경
           </button>
-          {kakaoLinked ? (
+          {!KAKAO_ENABLED ? null : kakaoLinked ? (
             <p className="px-4 py-2.5 text-slate-400">카카오 연결됨 ✓</p>
           ) : (
             <button role="menuitem" onClick={linkKakao} className="block w-full px-4 py-2.5 text-left hover:bg-slate-50">
@@ -75,8 +89,9 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
             </button>
           )}
           {member.role === "admin" && (
-            <Link role="menuitem" href="/admin" className="block px-4 py-2.5 hover:bg-slate-50">
+            <Link role="menuitem" href="/admin" className="flex items-center justify-between px-4 py-2.5 hover:bg-slate-50">
               관리자 페이지
+              {pendingCount > 0 && <span className="rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white">신청 {pendingCount}</span>}
             </Link>
           )}
           <button role="menuitem" onClick={() => signOut()} className="block w-full px-4 py-2.5 text-left text-rose-600 hover:bg-slate-50">

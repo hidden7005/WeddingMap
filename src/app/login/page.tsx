@@ -4,27 +4,32 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { formatPhone, isValidKoreanMobile, normalizePhone, toE164 } from "@/lib/phone";
+import { isValidEmail, normalizeEmail } from "@/lib/members";
 import { useAuth } from "@/components/AuthProvider";
 
 const RESEND_SECONDS = 60;
+const KAKAO_ENABLED = process.env.NEXT_PUBLIC_KAKAO_LOGIN === "on";
+
+type Step = "email" | "code" | "request" | "requested" | "pending" | "suspended" | "link";
 
 function friendlyError(message: string): string {
-  if (/check_member|claim_session|schema cache|could not find the function/i.test(message)) return "로그인 기능은 준비 중이에요. 조금만 기다려주세요.";
-  if (/expired|invalid/i.test(message) && /token|otp/i.test(message)) return "인증번호가 틀렸거나 만료됐어요. 다시 확인해주세요.";
-  if (/rate|too many|security purposes/i.test(message)) return "요청이 너무 많아요. 잠시 후 다시 시도해주세요.";
-  if (/member|명단/i.test(message)) return "회원 명단에 없는 번호예요. 관리자에게 문의해주세요.";
-  if (/sms|provider|hook/i.test(message)) return "문자를 보내지 못했어요. 잠시 후 다시 시도하거나 관리자에게 문의해주세요.";
+  if (/email_login_status|request_access|schema cache|could not find the function/i.test(message)) return "로그인 기능은 준비 중이에요. 조금만 기다려주세요.";
+  if (/승인된 이메일만/.test(message)) return "승인된 이메일만 로그인할 수 있어요. 가입 신청 후 관리자 승인을 기다려주세요.";
+  if (/expired|invalid/i.test(message) && /token|otp|code/i.test(message)) return "코드가 틀렸거나 만료됐어요. 메일을 다시 확인해주세요.";
+  if (/rate|too many|security purposes|seconds/i.test(message)) return "요청이 너무 많아요. 잠시 후 다시 시도해주세요.";
+  if (/sending|smtp|email/i.test(message) && /error|fail/i.test(message)) return "메일을 보내지 못했어요. 잠시 후 다시 시도하거나 관리자에게 문의해주세요.";
   return message;
 }
 
 export default function LoginPage() {
   const router = useRouter();
   const { status, claim, refresh, signInWithKakao, linkKakao } = useAuth();
-  const [step, setStep] = useState<"info" | "code" | "link">("info");
+  const [step, setStep] = useState<Step>("email");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [code, setCode] = useState("");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
@@ -40,21 +45,18 @@ export default function LoginPage() {
     return () => clearTimeout(t);
   }, [resendIn]);
 
-  async function sendCode() {
+  /** 1) 이메일 확인 → 승인됐으면 로그인 코드 메일 발송 */
+  async function submitEmail() {
     setError(null);
-    if (!name.trim()) return setError("이름을 입력해주세요.");
-    if (!isValidKoreanMobile(phone)) return setError("휴대폰 번호를 정확히 입력해주세요. (예: 010-1234-5678)");
+    if (!isValidEmail(email)) return setError("이메일 주소를 정확히 입력해주세요.");
     setBusy(true);
     try {
-      const { data: ok, error: e1 } = await supabase.rpc("check_member", { p_name: name, p_phone: phone });
+      const { data: st, error: e1 } = await supabase.rpc("email_login_status", { p_email: normalizeEmail(email) });
       if (e1) throw e1;
-      if (!ok) return setError("등록된 회원 정보와 일치하지 않아요. 이름과 번호를 확인하거나 관리자에게 문의해주세요.");
-      const { error: e2 } = await supabase.auth.signInWithOtp({ phone: toE164(phone) });
-      if (e2) throw e2;
-      setStep("code");
-      setCode("");
-      setResendIn(RESEND_SECONDS);
-      setTimeout(() => codeRef.current?.focus(), 50);
+      if (st === "pending") return setStep("pending");
+      if (st === "suspended") return setStep("suspended");
+      if (st !== "approved") return setStep("request");
+      await sendCode();
     } catch (e) {
       setError(friendlyError((e as Error).message));
     } finally {
@@ -62,22 +64,36 @@ export default function LoginPage() {
     }
   }
 
+  async function sendCode() {
+    const { error: e } = await supabase.auth.signInWithOtp({
+      email: normalizeEmail(email),
+      options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}/auth/callback` },
+    });
+    if (e) throw e;
+    setStep("code");
+    setCode("");
+    setResendIn(RESEND_SECONDS);
+    setTimeout(() => codeRef.current?.focus(), 50);
+  }
+
+  /** 2) 메일로 받은 코드 확인 → 이 기기를 현재 로그인으로 등록 */
   async function verify() {
     setError(null);
-    if (!/^\d{6}$/.test(code)) return setError("문자로 받은 6자리 숫자를 입력해주세요.");
+    if (!/^\d{6,10}$/.test(code)) return setError("메일로 받은 숫자 코드를 입력해주세요.");
     setBusy(true);
     try {
-      const { error: e } = await supabase.auth.verifyOtp({ phone: toE164(phone), token: code, type: "sms" });
+      const { error: e } = await supabase.auth.verifyOtp({ email: normalizeEmail(email), token: code, type: "email" });
       if (e) throw e;
-      const r = await claim(); // 이 기기를 현재 로그인으로 → 다른 기기는 자동 로그아웃
+      const r = await claim();
       if (r !== "ok") {
         await supabase.auth.signOut({ scope: "local" });
-        throw new Error(r === "suspended" ? "이용이 정지된 계정이에요." : "회원 명단에 없는 번호예요. 관리자에게 문의해주세요.");
+        throw new Error(r === "suspended" ? "이용이 정지된 계정이에요." : "승인된 회원 정보와 연결되지 않았어요. 관리자에게 문의해주세요.");
       }
       await refresh();
-      // 카카오 미연결이면 연결 권유 (다음부터 문자 없이 로그인)
-      const { data } = await supabase.auth.getUser();
-      if (!data.user?.identities?.some((i) => i.provider === "kakao")) return setStep("link");
+      if (KAKAO_ENABLED) {
+        const { data } = await supabase.auth.getUser();
+        if (!data.user?.identities?.some((i) => i.provider === "kakao")) return setStep("link");
+      }
       router.replace("/");
     } catch (e) {
       setError(friendlyError((e as Error).message));
@@ -86,6 +102,40 @@ export default function LoginPage() {
     }
   }
 
+  /** 가입 신청 */
+  async function requestAccess() {
+    setError(null);
+    if (!name.trim()) return setError("이름을 입력해주세요.");
+    if (!isValidEmail(email)) return setError("이메일 주소를 정확히 입력해주세요.");
+    setBusy(true);
+    try {
+      const { data: r, error: e } = await supabase.rpc("request_access", {
+        p_name: name.trim(),
+        p_email: normalizeEmail(email),
+        p_phone: phone.trim() || undefined,
+        p_note: note.trim() || undefined,
+      });
+      if (e) throw e;
+      if (r === "requested" || r === "already_pending") return setStep("requested");
+      if (r === "already_approved") return await sendCode();
+      if (r === "suspended") return setStep("suspended");
+      if (r === "too_many") return setError("신청이 많이 밀려 있어요. 잠시 후 다시 시도하거나 관리자에게 직접 연락해주세요.");
+      setError("입력한 내용을 다시 확인해주세요.");
+    } catch (e) {
+      setError(friendlyError((e as Error).message));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const inputCls = "mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-[15px] outline-none focus:border-slate-500";
+  const primaryBtn = "h-12 w-full rounded-xl bg-slate-900 font-semibold text-white disabled:opacity-50";
+  const backToEmail = (
+    <button type="button" onClick={() => (setStep("email"), setError(null))} className="text-sm text-slate-500 hover:text-slate-900">
+      ‹ 다른 이메일로
+    </button>
+  );
+
   return (
     <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-4 py-10">
       <div className="w-full max-w-sm">
@@ -93,95 +143,133 @@ export default function LoginPage() {
         <p className="mt-1 text-center text-sm text-slate-500">웨딩 촬영자를 위한 예식장 지도</p>
 
         <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm">
-          {step === "info" ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                sendCode();
-              }}
-              className="space-y-4"
-            >
-              <KakaoButton onClick={signInWithKakao}>카카오로 로그인</KakaoButton>
-              <div className="flex items-center gap-3 text-xs text-slate-400">
-                <span className="h-px flex-1 bg-slate-200" />
-                처음이거나 카카오 연결 전이라면
-                <span className="h-px flex-1 bg-slate-200" />
-              </div>
-              <p className="text-sm text-slate-600">관리자에게 등록된 이름과 휴대폰 번호로 인증해요.</p>
+          {step === "email" && (
+            <form onSubmit={(e) => (e.preventDefault(), submitEmail())} className="space-y-4">
+              {KAKAO_ENABLED && (
+                <>
+                  <KakaoButton onClick={signInWithKakao}>카카오로 로그인</KakaoButton>
+                  <Divider>또는 이메일로</Divider>
+                </>
+              )}
+              <p className="text-sm text-slate-600">관리자가 승인한 이메일로 로그인해요. 비밀번호 없이 메일로 받은 코드를 입력하면 돼요.</p>
               <label className="block">
-                <span className="text-sm font-semibold">이름</span>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  autoComplete="name"
-                  className="mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-[15px] outline-none focus:border-slate-500"
-                  placeholder="홍길동"
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-semibold">휴대폰 번호</span>
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  className="mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-[15px] outline-none focus:border-slate-500"
-                  placeholder="010-1234-5678"
-                />
+                <span className="text-sm font-semibold">이메일</span>
+                <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" inputMode="email" autoComplete="email" className={inputCls} placeholder="you@example.com" />
               </label>
               {error && <p className="text-sm text-rose-600">{error}</p>}
-              <button disabled={busy} className="h-12 w-full rounded-xl bg-slate-900 font-semibold text-white disabled:opacity-50">
-                {busy ? "확인 중…" : "문자로 인증번호 받기"}
+              <button disabled={busy} className={primaryBtn}>
+                {busy ? "확인 중…" : "로그인 코드 받기"}
               </button>
+              <p className="text-center text-xs text-slate-400">처음이신가요? 이메일을 입력하면 가입 신청 화면으로 안내해요.</p>
             </form>
-          ) : step === "link" ? (
+          )}
+
+          {step === "code" && (
+            <form onSubmit={(e) => (e.preventDefault(), verify())} className="space-y-4">
+              <p className="text-sm text-slate-600">
+                <b>{normalizeEmail(email)}</b> 로 보낸 메일의 <b>숫자 코드</b>를 입력해주세요. 메일 안의 로그인 링크를 눌러도 돼요.
+              </p>
+              <input
+                ref={codeRef}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                className="h-14 w-full rounded-xl border border-slate-200 text-center text-2xl tracking-[0.4em] outline-none focus:border-slate-500"
+                placeholder="••••••"
+                aria-label="로그인 코드"
+              />
+              {error && <p className="text-sm text-rose-600">{error}</p>}
+              <button disabled={busy} className={primaryBtn}>
+                {busy ? "확인 중…" : "로그인"}
+              </button>
+              <div className="flex justify-between">
+                {backToEmail}
+                <button
+                  type="button"
+                  disabled={resendIn > 0 || busy}
+                  onClick={async () => {
+                    setError(null);
+                    try {
+                      await sendCode();
+                    } catch (e) {
+                      setError(friendlyError((e as Error).message));
+                    }
+                  }}
+                  className="text-sm text-slate-500 hover:text-slate-900 disabled:opacity-40"
+                >
+                  {resendIn > 0 ? `재전송 ${resendIn}초` : "코드 다시 받기"}
+                </button>
+              </div>
+              <p className="text-xs text-slate-400">메일이 안 보이면 스팸함도 확인해주세요.</p>
+            </form>
+          )}
+
+          {step === "request" && (
+            <form onSubmit={(e) => (e.preventDefault(), requestAccess())} className="space-y-4">
+              <div>
+                <p className="font-bold">가입 신청</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  <b>{normalizeEmail(email)}</b> 은(는) 아직 승인되지 않은 이메일이에요. 신청하면 관리자 확인 후 로그인할 수 있어요.
+                </p>
+              </div>
+              <label className="block">
+                <span className="text-sm font-semibold">이름</span>
+                <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={30} className={inputCls} placeholder="홍길동" />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold">
+                  휴대폰 번호 <span className="font-normal text-slate-400">(선택, 관리자 확인용)</span>
+                </span>
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" inputMode="numeric" autoComplete="tel" className={inputCls} placeholder="010-1234-5678" />
+              </label>
+              <label className="block">
+                <span className="text-sm font-semibold">
+                  한 줄 소개 <span className="font-normal text-slate-400">(선택)</span>
+                </span>
+                <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} className={inputCls} placeholder="예: OO스냅 대표, 서울·경기 본식 스냅" />
+              </label>
+              {error && <p className="text-sm text-rose-600">{error}</p>}
+              <button disabled={busy} className={primaryBtn}>
+                {busy ? "신청 중…" : "가입 신청"}
+              </button>
+              {backToEmail}
+            </form>
+          )}
+
+          {(step === "requested" || step === "pending") && (
+            <div className="space-y-3 text-center">
+              <p className="text-lg font-bold">{step === "requested" ? "신청이 접수됐어요" : "승인 대기 중이에요"}</p>
+              <p className="text-sm leading-relaxed text-slate-600">
+                관리자가 확인하고 승인하면
+                <br />
+                <b>{normalizeEmail(email)}</b> 로 로그인할 수 있어요.
+              </p>
+              {backToEmail}
+            </div>
+          )}
+
+          {step === "suspended" && (
+            <div className="space-y-3 text-center">
+              <p className="text-lg font-bold">이용이 정지된 계정이에요</p>
+              <p className="text-sm text-slate-600">관리자에게 문의해주세요.</p>
+              {backToEmail}
+            </div>
+          )}
+
+          {step === "link" && (
             <div className="space-y-4 text-center">
-              <p className="text-lg font-bold">인증 완료!</p>
+              <p className="text-lg font-bold">로그인 완료!</p>
               <p className="text-sm leading-relaxed text-slate-600">
                 카카오 계정을 연결하면 다음부터는
                 <br />
-                <b>카카오 버튼 한 번</b>으로 로그인돼요. (문자 인증 없이)
+                <b>카카오 버튼 한 번</b>으로 로그인돼요.
               </p>
               <KakaoButton onClick={linkKakao}>카카오 계정 연결하기</KakaoButton>
               <button onClick={() => router.replace("/")} className="text-sm text-slate-500 hover:text-slate-900">
                 나중에 할게요
               </button>
             </div>
-          ) : (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                verify();
-              }}
-              className="space-y-4"
-            >
-              <p className="text-sm text-slate-600">
-                <b>{formatPhone(normalizePhone(phone))}</b> 로 보낸 6자리 인증번호를 입력해주세요.
-              </p>
-              <input
-                ref={codeRef}
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                className="h-14 w-full rounded-xl border border-slate-200 text-center text-2xl tracking-[0.5em] outline-none focus:border-slate-500"
-                placeholder="••••••"
-                aria-label="인증번호"
-              />
-              {error && <p className="text-sm text-rose-600">{error}</p>}
-              <button disabled={busy} className="h-12 w-full rounded-xl bg-slate-900 font-semibold text-white disabled:opacity-50">
-                {busy ? "확인 중…" : "로그인"}
-              </button>
-              <div className="flex justify-between text-sm">
-                <button type="button" onClick={() => (setStep("info"), setError(null))} className="text-slate-500 hover:text-slate-900">
-                  ‹ 번호 다시 입력
-                </button>
-                <button type="button" disabled={resendIn > 0 || busy} onClick={sendCode} className="text-slate-500 hover:text-slate-900 disabled:opacity-40">
-                  {resendIn > 0 ? `재전송 ${resendIn}초` : "인증번호 재전송"}
-                </button>
-              </div>
-            </form>
           )}
         </div>
 
@@ -197,6 +285,16 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+function Divider({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 text-xs text-slate-400">
+      <span className="h-px flex-1 bg-slate-200" />
+      {children}
+      <span className="h-px flex-1 bg-slate-200" />
+    </div>
   );
 }
 

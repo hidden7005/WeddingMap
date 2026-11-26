@@ -9,7 +9,7 @@ Next.js(App Router) + TypeScript + Tailwind / Supabase / 네이버 지도.
 |---|---|---|
 | 1 | Supabase 스키마 + RLS + CSV import | ✅ 완료 (WeddingMap 프로젝트, 서울 리전에 적용됨) |
 | 2 | 지도 화면 (마커·클러스터·검색·상세 시트, 읽기 전용) | ✅ 완료 (확인 대기) |
-| 3-1 | 회원 명단 + 문자 인증 가입 + 카카오 로그인 + 1기기 로그인 + 접속 기록·공유 의심 + 워터마크 + 관리자 화면 + 회원만 보기 | ✅ 코드 완료 (설정 대기) |
+| 3-1 | 회원 명단 + **이메일 로그인(관리자 승인제)** + 1기기 로그인 + 접속 기록·공유 의심 + 워터마크 + 관리자 화면 + 회원만 보기 (카카오 로그인은 선택) | ✅ |
 | 3-1+ | 주차·촬영 특이사항(글+사진 최대 4장, 회원별 여러 개) | ✅ 코드 완료 (0007 적용 후 0008) |
 | 3-2 | 입력·수정 폼 + 예식장 추가 + 수정 이력 | |
 | 4 | 필터, 완성도 색상, 공유 URL, 길찾기 | |
@@ -91,6 +91,22 @@ npm run import:venues       # .env.local 의 SERVICE_ROLE_KEY 로 upsert
   select count(distinct road_address) from venue_map where same_address_count > 1;  -- 28
   ```
 - Authentication → Policies : 6개 테이블 모두 RLS 켜짐
+
+## 로그인·회원 (이메일 + 관리자 승인)
+
+- **승인된 이메일만 로그인**: 관리자가 관리자 화면에서 이름·이메일을 등록(바로 승인)하거나, 회원이 로그인 화면에서 **가입 신청** → 관리자가 **승인**.
+- 로그인: 이메일 입력 → 메일로 받은 **숫자 코드** 입력 (또는 메일의 링크 클릭). 비밀번호 없음.
+- 첫 로그인 시 회원 명단과 자동 연결(`members.user_id`, status active).
+- **1기기 로그인**: 새 기기에서 로그인하면 이전 기기는 자동 로그아웃 (`active_sessions`).
+- 접속 기록(`login_events`)·공유 의심 표시, 화면 워터마크(이름·닉네임·날짜).
+- 카카오 로그인(선택): Supabase 에 Kakao 공급자 설정 후 `NEXT_PUBLIC_KAKAO_LOGIN=on`.
+
+### Supabase 설정 (대시보드)
+1. **Authentication → Sign In / Providers → Email**: 켜기, *Confirm email* 켜기.
+2. **Authentication → Emails → Magic Link** 템플릿에 코드 추가: `로그인 코드: {{ .Token }}` (링크와 함께 표시됨).
+3. **Authentication → URL Configuration**: Site URL `https://wedding-map.vercel.app`, Redirect URLs 에 `https://wedding-map.vercel.app/auth/callback`.
+4. (권장) **Authentication → Hooks → Before User Created** → Postgres → `public.hook_before_user_created` : 승인 안 된 이메일은 계정 생성 자체를 거부.
+5. **이메일 발송(SMTP)**: Supabase 기본 메일은 프로젝트 팀원 주소로만, 시간당 소량만 발송됨 → 실제 회원용으로는 **Custom SMTP** 설정 필요 (예: Resend, Gmail 앱 비밀번호).
 
 ## 데이터 설계 요점
 

@@ -27,39 +27,3 @@ export function formatPhone(stored: string | null | undefined): string {
 export function toDomestic(stored: string): string {
   return "0" + normalizePhone(stored).replace(/^82/, "");
 }
-
-/**
- * 관리자 일괄 등록: 한 줄에 "이름, 전화번호" (쉼표·탭·공백 구분, 순서 무관)
- * 엑셀에서 두 열을 복사해 붙여넣어도 됨.
- */
-export function parseMemberLines(text: string): { members: { name: string; phone: string }[]; errors: string[] } {
-  const members: { name: string; phone: string }[] = [];
-  const errors: string[] = [];
-  const seen = new Set<string>();
-  text
-    .replace(/^﻿/, "")
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .forEach((line, i) => {
-      const phoneMatch = line.match(/(\+?82[\s-]?|0)1[016789][\s-]?\d{3,4}[\s-]?\d{4}/);
-      if (!phoneMatch) {
-        if (i === 0 && /이름|name|전화|phone/i.test(line)) return; // 머리글 줄
-        errors.push(`${i + 1}번째 줄: 휴대폰 번호를 찾을 수 없어요 — "${line}"`);
-        return;
-      }
-      const phone = normalizePhone(phoneMatch[0]);
-      const name = line.replace(phoneMatch[0], "").replace(/[,\t;]/g, " ").replace(/\s+/g, " ").trim();
-      if (!name) {
-        errors.push(`${i + 1}번째 줄: 이름이 없어요 — "${line}"`);
-        return;
-      }
-      if (seen.has(phone)) {
-        errors.push(`${i + 1}번째 줄: 위에 같은 번호가 있어요 — ${formatPhone(phone)}`);
-        return;
-      }
-      seen.add(phone);
-      members.push({ name, phone });
-    });
-  return { members, errors };
-}

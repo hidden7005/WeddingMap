@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import type { Tables, Views } from "@/lib/database.types";
-import { formatPhone, isValidKoreanMobile, normalizePhone, parseMemberLines } from "@/lib/phone";
+import { formatPhone } from "@/lib/phone";
+import { parseMemberLines } from "@/lib/members";
 import { formatDate } from "@/lib/format";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -17,7 +18,7 @@ function isSuspicious(st?: Stats) {
 }
 
 const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
-  invited: { text: "가입 전", cls: "bg-slate-100 text-slate-600" },
+  invited: { text: "승인 · 로그인 전", cls: "bg-slate-100 text-slate-600" },
   active: { text: "가입", cls: "bg-emerald-50 text-emerald-700" },
   suspended: { text: "정지", cls: "bg-rose-50 text-rose-700" },
 };
@@ -76,22 +77,29 @@ function Admin({ myUserId, requireLogin, onSettingsChanged }: { myUserId: string
     load();
   }, [load]);
 
+  const approved = useMemo(() => (members ?? []).filter((m) => m.approved_at), [members]);
+  const pending = useMemo(() => (members ?? []).filter((m) => !m.approved_at), [members]);
+
   const shown = useMemo(() => {
-    const q = filter.replace(/\s/g, "");
-    const base = (members ?? []).filter((m) => !onlySuspicious || isSuspicious(m.stats));
+    const q = filter.replace(/\s/g, "").toLowerCase();
+    const base = approved.filter((m) => !onlySuspicious || isSuspicious(m.stats));
     if (!q) return base;
     const qPhone = q.replace(/\D/g, "");
     return base.filter(
-      (m) => m.name.replace(/\s/g, "").includes(q) || (qPhone.length >= 3 && formatPhone(m.phone).replace(/\D/g, "").includes(qPhone)) || m.nickname?.includes(q),
+      (m) =>
+        m.name.replace(/\s/g, "").includes(q) ||
+        m.email?.includes(q) ||
+        (qPhone.length >= 3 && formatPhone(m.phone).replace(/\D/g, "").includes(qPhone)) ||
+        m.nickname?.toLowerCase().includes(q),
     );
-  }, [members, filter, onlySuspicious]);
-  const suspiciousCount = useMemo(() => (members ?? []).filter((m) => isSuspicious(m.stats)).length, [members]);
+  }, [approved, filter, onlySuspicious]);
+  const suspiciousCount = useMemo(() => approved.filter((m) => isSuspicious(m.stats)).length, [approved]);
 
   const counts = useMemo(() => {
     const c = { invited: 0, active: 0, suspended: 0 };
-    members?.forEach((m) => (c[m.status as keyof typeof c] += 1));
+    approved.forEach((m) => (c[m.status as keyof typeof c] += 1));
     return c;
-  }, [members]);
+  }, [approved]);
 
   async function setStatus(m: Member, next: "suspended" | "active" | "invited") {
     const { error: e } = await supabase.from("members").update({ status: next }).eq("id", m.id);
@@ -99,8 +107,21 @@ function Admin({ myUserId, requireLogin, onSettingsChanged }: { myUserId: string
     load();
   }
 
+  async function approve(m: Member) {
+    const { error: e } = await supabase.from("members").update({ approved_at: new Date().toISOString() }).eq("id", m.id);
+    if (e) return alert("승인하지 못했어요: " + e.message);
+    load();
+  }
+
+  async function reject(m: Member) {
+    if (!confirm(`${m.name} (${m.email}) 의 가입 신청을 거절할까요?\n신청 내역이 삭제돼요.`)) return;
+    const { error: e } = await supabase.from("members").delete().eq("id", m.id);
+    if (e) return alert("거절하지 못했어요: " + e.message);
+    load();
+  }
+
   async function remove(m: Member) {
-    if (!confirm(`${m.name} (${formatPhone(m.phone)}) 을(를) 명단에서 삭제할까요?\n삭제하면 이 번호로 더 이상 로그인할 수 없어요.`)) return;
+    if (!confirm(`${m.name} (${m.email ?? formatPhone(m.phone)}) 을(를) 명단에서 삭제할까요?\n삭제하면 이 이메일로 더 이상 로그인할 수 없어요.`)) return;
     const { error: e } = await supabase.from("members").delete().eq("id", m.id);
     if (e) return alert("삭제하지 못했어요: " + e.message);
     load();
@@ -115,15 +136,16 @@ function Admin({ myUserId, requireLogin, onSettingsChanged }: { myUserId: string
         </Link>
       </div>
 
+      <PendingRequests pending={pending} onApprove={approve} onReject={reject} />
       <ViewSetting requireLogin={requireLogin} onChanged={onSettingsChanged} />
       <AddMembers existing={members ?? []} onAdded={load} />
 
       <section className="mt-8">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="font-bold">회원 명단 {members ? members.length : ""}</h2>
+            <h2 className="font-bold">승인된 회원 {members ? approved.length : ""}</h2>
             <p className="text-xs text-slate-500">
-              가입 {counts.active} · 가입 전 {counts.invited} · 정지 {counts.suspended}
+              가입(로그인함) {counts.active} · 로그인 전 {counts.invited} · 정지 {counts.suspended}
             </p>
           </div>
           <label className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm ${suspiciousCount ? "text-rose-700" : "text-slate-400"}`}>
@@ -133,7 +155,7 @@ function Admin({ myUserId, requireLogin, onSettingsChanged }: { myUserId: string
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="이름·번호·닉네임 검색"
+            placeholder="이름·이메일·닉네임 검색"
             className="h-10 w-48 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-500"
           />
         </div>
@@ -155,8 +177,9 @@ function Admin({ myUserId, requireLogin, onSettingsChanged }: { myUserId: string
                       {m.role === "admin" && <span className="ml-1.5 text-xs font-normal text-slate-500">관리자</span>}
                       {m.nickname && <span className="ml-1.5 text-xs font-normal text-slate-400">@{m.nickname}</span>}
                     </p>
-                    <p className="text-slate-500">
-                      {formatPhone(m.phone)}
+                    <p className="break-all text-slate-500">
+                      {m.email ?? <span className="text-amber-600">이메일 없음 — 로그인 불가</span>}
+                      {m.phone && <span className="ml-2 text-xs text-slate-400">{formatPhone(m.phone)}</span>}
                       {m.joined_at && <span className="ml-2 text-xs text-slate-400">가입 {formatDate(m.joined_at)}</span>}
                     </p>
                     {m.stats && (
@@ -199,6 +222,54 @@ function Admin({ myUserId, requireLogin, onSettingsChanged }: { myUserId: string
   );
 }
 
+function PendingRequests({
+  pending,
+  onApprove,
+  onReject,
+}: {
+  pending: Member[];
+  onApprove: (m: Member) => void;
+  onReject: (m: Member) => void;
+}) {
+  return (
+    <section className={`mt-6 rounded-xl border p-4 ${pending.length ? "border-rose-200 bg-rose-50/40" : "border-slate-200"}`}>
+      <h2 className="font-bold">
+        가입 신청 {pending.length > 0 && <span className="ml-1 rounded-full bg-rose-600 px-2 py-0.5 text-xs text-white">{pending.length}</span>}
+      </h2>
+      {pending.length === 0 ? (
+        <p className="mt-1 text-sm text-slate-500">승인을 기다리는 신청이 없어요.</p>
+      ) : (
+        <ul className="mt-3 divide-y divide-rose-100">
+          {pending.map((m) => (
+            <li key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">
+                  {m.name}
+                  <span className="ml-2 text-xs font-normal text-slate-400">신청 {formatDate(m.created_at)}</span>
+                </p>
+                <p className="break-all text-slate-600">
+                  {m.email}
+                  {m.phone && <span className="ml-2 text-slate-400">{formatPhone(m.phone)}</span>}
+                </p>
+                {m.request_note && <p className="mt-0.5 text-xs text-slate-500">“{m.request_note}”</p>}
+              </div>
+              <div className="flex gap-1">
+                <button onClick={() => onApprove(m)} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">
+                  승인
+                </button>
+                <button onClick={() => onReject(m)} className="rounded-lg px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50">
+                  거절
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-xs text-slate-400">사이트의 로그인 화면에서 승인되지 않은 이메일을 입력하면 가입 신청을 할 수 있어요.</p>
+    </section>
+  );
+}
+
 function ViewSetting({ requireLogin, onChanged }: { requireLogin: boolean; onChanged: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   async function toggle() {
@@ -234,8 +305,8 @@ function AddMembers({ existing, onAdded }: { existing: Member[]; onAdded: () => 
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const parsed = useMemo(() => parseMemberLines(text), [text]);
-  const existingPhones = useMemo(() => new Set(existing.map((m) => m.phone)), [existing]);
-  const fresh = parsed.members.filter((m) => !existingPhones.has(m.phone) && isValidKoreanMobile(m.phone));
+  const existingEmails = useMemo(() => new Set(existing.map((m) => m.email).filter(Boolean)), [existing]);
+  const fresh = parsed.members.filter((m) => !existingEmails.has(m.email));
   const dupCount = parsed.members.length - fresh.length;
 
   async function onFile(f: File) {
@@ -246,12 +317,11 @@ function AddMembers({ existing, onAdded }: { existing: Member[]; onAdded: () => 
     if (!fresh.length) return;
     setBusy(true);
     setResult(null);
-    const { error } = await supabase
-      .from("members")
-      .upsert(fresh.map((m) => ({ name: m.name, phone: normalizePhone(m.phone) })), { onConflict: "phone", ignoreDuplicates: true });
+    const now = new Date().toISOString();
+    const { error } = await supabase.from("members").insert(fresh.map((m) => ({ name: m.name, email: m.email, phone: m.phone, approved_at: now })));
     setBusy(false);
-    if (error) return setResult("등록하지 못했어요: " + error.message);
-    setResult(`${fresh.length}명을 등록했어요. 이제 이 사람들은 이름과 번호로 로그인할 수 있어요.`);
+    if (error) return setResult(error.code === "23505" ? "이미 등록된 이메일이나 번호가 섞여 있어요. 목록을 새로고침한 뒤 다시 시도해주세요." : "등록하지 못했어요: " + error.message);
+    setResult(`${fresh.length}명을 승인 상태로 등록했어요. 이제 이 이메일로 로그인할 수 있어요.`);
     setText("");
     onAdded();
   }
@@ -260,13 +330,14 @@ function AddMembers({ existing, onAdded }: { existing: Member[]; onAdded: () => 
     <section className="mt-6 rounded-xl border border-slate-200 p-4">
       <h2 className="font-bold">회원 추가</h2>
       <p className="mt-1 text-sm text-slate-500">
-        한 줄에 한 명씩 <b>이름, 휴대폰 번호</b>를 입력하세요. 엑셀에서 두 열을 복사해 붙여넣거나 CSV 파일을 올려도 돼요.
+        한 줄에 한 명씩 <b>이름, 이메일</b>을 입력하세요 (휴대폰 번호는 있으면 함께 저장). 여기 등록한 사람은 <b>바로 승인</b>돼요. 엑셀에서 열을 복사해
+        붙여넣거나 CSV 파일을 올려도 돼요.
       </p>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={5}
-        placeholder={"홍길동, 010-1234-5678\n김철수\t01098765432"}
+        placeholder={"홍길동, hong@example.com\n김철수\tkim@snap.kr\t010-1234-5678"}
         className="mt-3 w-full rounded-lg border border-slate-200 p-3 font-mono text-sm outline-none focus:border-slate-500"
       />
       <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -279,7 +350,7 @@ function AddMembers({ existing, onAdded }: { existing: Member[]; onAdded: () => 
         </button>
         {text.trim() && (
           <span className="text-xs text-slate-500">
-            인식 {parsed.members.length}명{dupCount ? ` · 이미 등록된 번호 ${dupCount}명 제외` : ""}
+            인식 {parsed.members.length}명{dupCount ? ` · 이미 등록된 이메일 ${dupCount}명 제외` : ""}
           </span>
         )}
       </div>
@@ -314,7 +385,7 @@ function LoginLog({ userId }: { userId: string }) {
         <li key={r.id} className="flex flex-wrap gap-x-2">
           <span className="tabular-nums text-slate-400">{new Date(r.created_at).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
           <span>{r.device ?? "알 수 없는 기기"}</span>
-          <span className="text-slate-400">{r.method === "oauth" ? "카카오" : r.method === "otp" ? "문자" : r.method ?? ""}</span>
+          <span className="text-slate-400">{r.method === "oauth" ? "카카오" : r.method === "otp" || r.method === "magiclink" ? "이메일" : r.method ?? ""}</span>
           {r.replaced_other && <span className="text-rose-600">다른 기기 밀어냄</span>}
         </li>
       ))}
