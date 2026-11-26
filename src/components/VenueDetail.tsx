@@ -20,9 +20,9 @@ import {
   formatOvertime,
 } from "@/lib/format";
 import type { VenuePin } from "@/lib/sites";
-import VenueNotes from "./VenueNotes";
+import VenueNotes, { Linkify } from "./VenueNotes";
 import { AdminVenueActions, VenueDeleteRequest } from "./VenueRequest";
-import { HallEditor, ParkingEditor } from "./VenueEdit";
+import { HallEditor, NearbyParkingEditor, ParkingEditor } from "./VenueEdit";
 import { useAuth } from "./AuthProvider";
 
 type Editor = { editor: { nickname: string } | null };
@@ -401,6 +401,7 @@ function ParkingTab({
   onSaved: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [nearbyEditing, setNearbyEditing] = useState<string | null>(null); // 주차장 id 또는 "new"
   const hasInfo =
     venue.guest_free_minutes != null ||
     venue.overtime_fee != null ||
@@ -450,25 +451,44 @@ function ParkingTab({
       >
         {parking.length ? (
           <ul className="space-y-2">
-            {parking.map((p) => (
+            {parking.map((p) => nearbyEditing === p.id ? (
+              <li key={p.id}>
+                <NearbyParkingEditor
+                  venueId={venue.id}
+                  parking={p}
+                  onCancel={() => setNearbyEditing(null)}
+                  onDone={() => {
+                    setNearbyEditing(null);
+                    onSaved();
+                  }}
+                />
+              </li>
+            ) : (
               <li
                 key={p.id}
                 className={`rounded-xl border border-slate-200 p-3 ${isStale(p.checked_at) ? "opacity-50" : ""}`}
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="font-semibold">{p.name}</p>
-                  {p.walk_minutes != null && (
-                    <p className="shrink-0 text-xs text-slate-500">
-                      도보 {p.walk_minutes}분
-                    </p>
-                  )}
+                  <span className="flex shrink-0 items-center gap-2">
+                    {p.walk_minutes != null && (
+                      <span className="text-xs text-slate-500">
+                        도보 {p.walk_minutes}분
+                      </span>
+                    )}
+                    {canEdit && !nearbyEditing && (
+                      <button onClick={() => setNearbyEditing(p.id)} className="rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100">
+                        수정
+                      </button>
+                    )}
+                  </span>
                 </div>
                 {p.fee && (
                   <p className="mt-0.5 text-sm text-slate-700">{p.fee}</p>
                 )}
                 {p.memo && (
-                  <p className="mt-0.5 text-sm whitespace-pre-line text-slate-500">
-                    {p.memo}
+                  <p className="mt-0.5 text-sm break-words whitespace-pre-line text-slate-500">
+                    <Linkify text={p.memo} />
                   </p>
                 )}
                 <div className="mt-1">
@@ -477,9 +497,31 @@ function ParkingTab({
               </li>
             ))}
           </ul>
-        ) : (
+        ) : nearbyEditing !== "new" ? (
           <Empty>등록된 주변 주차장이 없어요</Empty>
-        )}
+        ) : null}
+        {canEdit &&
+          (nearbyEditing === "new" ? (
+            <div className="mt-2">
+              <NearbyParkingEditor
+                venueId={venue.id}
+                onCancel={() => setNearbyEditing(null)}
+                onDone={() => {
+                  setNearbyEditing(null);
+                  onSaved();
+                }}
+              />
+            </div>
+          ) : (
+            !nearbyEditing && (
+              <button
+                onClick={() => setNearbyEditing("new")}
+                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                <span className="text-lg leading-none">＋</span> 주변 주차장 추가
+              </button>
+            )
+          ))}
       </Section>
     </>
   );

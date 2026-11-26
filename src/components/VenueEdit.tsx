@@ -441,3 +441,97 @@ export function ParkingEditor({
     </form>
   );
 }
+
+/* ───────────────────────── 주변 주차장 ───────────────────────── */
+
+type NearbyParking = Tables<"nearby_parking">;
+
+export function NearbyParkingEditor({
+  venueId,
+  parking,
+  onDone,
+  onCancel,
+}: {
+  venueId: string;
+  /** 있으면 수정 */
+  parking?: NearbyParking;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(parking?.name ?? "");
+  const [fee, setFee] = useState(parking?.fee ?? "");
+  const [walk, setWalk] = useState(parking?.walk_minutes != null ? String(parking.walk_minutes) : "");
+  const [memo, setMemo] = useState(parking?.memo ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return setError("주차장 이름을 적어주세요");
+    setBusy(true);
+    setError(null);
+    const row = {
+      name: name.trim().slice(0, 80),
+      fee: fee.trim().slice(0, 200) || null,
+      walk_minutes: walk ? Math.min(120, Number(walk)) : null,
+      memo: memo.trim().slice(0, 500) || null,
+    };
+    const { error } = parking
+      ? await supabase.from("nearby_parking").update(row).eq("id", parking.id)
+      : await supabase.from("nearby_parking").insert({ ...row, venue_id: venueId });
+    setBusy(false);
+    if (error) return setError(friendly(error));
+    onDone();
+  }
+
+  async function remove() {
+    if (!parking || !confirm(`‘${parking.name}’ 주차장을 삭제할까요?`)) return;
+    setBusy(true);
+    const { error } = await supabase.from("nearby_parking").delete().eq("id", parking.id);
+    setBusy(false);
+    if (error) return setError(friendly(error));
+    onDone();
+  }
+
+  return (
+    <form onSubmit={save} className="space-y-4 rounded-xl border border-slate-300 bg-slate-50 p-4">
+      <Field label="주차장 이름">
+        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} className={inputCls} placeholder="예: 아시아공원 공영주차장" autoFocus />
+      </Field>
+      <Field label="요금">
+        <input value={fee} onChange={(e) => setFee(e.target.value)} maxLength={200} className={inputCls} placeholder="예: 10분당 500원 / 1일 20,000원" />
+      </Field>
+      <Field label="도보 (분)">
+        <input
+          value={walk}
+          onChange={(e) => setWalk(e.target.value.replace(/[^\d]/g, "").slice(0, 3))}
+          inputMode="numeric"
+          className="h-11 w-24 rounded-xl border border-slate-200 bg-white px-3 text-center text-[15px] outline-none focus:border-slate-500"
+          placeholder="예: 5"
+        />
+      </Field>
+      <Field label="메모" hint="네이버 지도 링크를 넣으면 누를 수 있어요">
+        <textarea
+          value={memo}
+          onChange={(e) => setMemo(e.target.value)}
+          maxLength={500}
+          rows={2}
+          className={`${inputCls} h-auto py-2.5`}
+          placeholder="예: 주말엔 오전에 금방 차요 / https://naver.me/…"
+        />
+      </Field>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <Actions
+        busy={busy}
+        onCancel={onCancel}
+        extra={
+          parking ? (
+            <button type="button" onClick={remove} disabled={busy} className="h-11 rounded-xl px-3 text-sm font-semibold text-rose-600 hover:bg-rose-50">
+              삭제
+            </button>
+          ) : undefined
+        }
+      />
+    </form>
+  );
+}
