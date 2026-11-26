@@ -372,6 +372,30 @@ export type Database = {
           },
         ]
       }
+      feedback: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+        }
+        Update: {
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_user_profile_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venue_requests: {
         Row: {
           created_at: string

@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./AuthProvider";
+import FeedbackDialog from "./FeedbackDialog";
 
 const KAKAO_ENABLED = process.env.NEXT_PUBLIC_KAKAO_LOGIN === "on";
 
 export default function UserMenu({ compact = false }: { compact?: boolean }) {
   const { status, member, signOut, kakaoLinked, linkKakao } = useAuth();
   const [open, setOpen] = useState(false);
+  const [feedback, setFeedback] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
   // 관리자: 승인 대기 중인 가입 신청 수
@@ -94,11 +96,15 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
               {pendingCount > 0 && <span className="rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white">신청 {pendingCount}</span>}
             </Link>
           )}
+          <button role="menuitem" onClick={() => (setOpen(false), setFeedback(true))} className="block w-full px-4 py-2.5 text-left hover:bg-slate-50">
+            수정 건의사항 보내기
+          </button>
           <button role="menuitem" onClick={() => signOut()} className="block w-full px-4 py-2.5 text-left text-rose-600 hover:bg-slate-50">
             로그아웃
           </button>
         </div>
       )}
+      {feedback && <FeedbackDialog onClose={() => setFeedback(false)} />}
     </div>
   );
 }
@@ -107,6 +113,7 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
 function CompactMenu() {
   const { status, member, signOut } = useAuth();
   const [open, setOpen] = useState(false);
+  const [feedback, setFeedback] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -162,6 +169,9 @@ function CompactMenu() {
                   {pendingCount > 0 && <span className="rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white">신청 {pendingCount}</span>}
                 </Link>
               )}
+              <button role="menuitem" onClick={() => (setOpen(false), setFeedback(true))} className="block w-full px-4 py-2.5 text-left hover:bg-slate-50">
+                수정 건의사항 보내기
+              </button>
               <button role="menuitem" onClick={() => signOut()} className="block w-full px-4 py-2.5 text-left text-rose-600 hover:bg-slate-50">
                 로그아웃
               </button>
@@ -174,6 +184,7 @@ function CompactMenu() {
           )}
         </div>
       )}
+      {feedback && <FeedbackDialog onClose={() => setFeedback(false)} />}
     </div>
   );
 }

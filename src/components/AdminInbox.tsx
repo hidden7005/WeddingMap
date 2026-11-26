@@ -10,6 +10,7 @@ import { suggestCode, teamLabel } from "@/lib/teams";
 import { useAuth } from "./AuthProvider";
 
 type Pending = { id: string; name: string; email: string | null; team: string | null; created_at: string };
+type Fb = { id: string; body: string; created_at: string; sender: { nickname: string } | null };
 type Req = { id: string; name: string; kind: string; venue_id: string | null; created_at: string; requester: { nickname: string } | null };
 
 /**
@@ -30,19 +31,27 @@ export default function AdminInbox({
   const isAdmin = member?.role === "admin";
   const [signups, setSignups] = useState<Pending[]>([]);
   const [requests, setRequests] = useState<Req[]>([]);
+  const [feedback, setFeedback] = useState<Fb[]>([]);
   const [open, setOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const [m, r] = await Promise.all([
+    const [m, r, f] = await Promise.all([
       supabase.from("members").select("id,name,email,team,created_at").is("approved_at", null).order("created_at"),
       supabase
         .from("venue_requests")
         .select("id,name,kind,venue_id,created_at, requester:profiles!venue_requests_requested_by_fkey(nickname)")
         .eq("status", "pending")
         .order("created_at"),
+      supabase
+        .from("feedback")
+        .select("id,body,created_at, sender:profiles!feedback_user_profile_fkey(nickname)")
+        .eq("status", "pending")
+        .order("created_at")
+        .limit(100),
     ]);
     if (!m.error) setSignups((m.data ?? []) as Pending[]);
     if (!r.error) setRequests((r.data ?? []) as unknown as Req[]);
+    if (!f.error) setFeedback((f.data ?? []) as unknown as Fb[]);
   }, []);
 
   // 처음, 1분마다, 앱으로 돌아올 때 새로고침
@@ -59,7 +68,7 @@ export default function AdminInbox({
   }, [isAdmin, load]);
 
   if (!isAdmin) return null;
-  const total = signups.length + requests.length;
+  const total = signups.length + requests.length + feedback.length;
   if (!total && !open) return null;
 
   return (
@@ -75,11 +84,14 @@ export default function AdminInbox({
         {signups.length > 0 && <span>가입 신청 {signups.length}</span>}
         {signups.length > 0 && requests.length > 0 && <span className="text-white/40">·</span>}
         {requests.length > 0 && <span>등록·삭제 요청 {requests.length}</span>}
+        {feedback.length > 0 && signups.length + requests.length > 0 && <span className="text-white/40">·</span>}
+        {feedback.length > 0 && <span>건의 {feedback.length}</span>}
       </button>
       {open && (
         <Panel
           signups={signups}
           requests={requests}
+          feedback={feedback}
           onClose={() => setOpen(false)}
           onChanged={load}
           onVenueDeleted={() => onVenueDeleted?.()}
@@ -96,6 +108,7 @@ export default function AdminInbox({
 function Panel({
   signups,
   requests,
+  feedback,
   onClose,
   onChanged,
   onVenueDeleted,
@@ -103,6 +116,7 @@ function Panel({
 }: {
   signups: Pending[];
   requests: Req[];
+  feedback: Fb[];
   onClose: () => void;
   onChanged: () => void;
   onVenueDeleted: () => void;
@@ -118,6 +132,11 @@ function Panel({
     if (data === "already_gone") alert("이미 지도에서 지워진 예식장이에요. 요청만 완료로 바꿨어요.");
     onChanged();
     onVenueDeleted();
+  }
+  async function feedbackDone(f: Fb) {
+    const { error } = await supabase.from("feedback").update({ status: "done" }).eq("id", f.id);
+    if (error) return alert("처리하지 못했어요: " + error.message);
+    onChanged();
   }
   async function setStatus(r: Req, status: "done" | "rejected") {
     const { error } = await supabase.from("venue_requests").update({ status }).eq("id", r.id);
@@ -197,6 +216,29 @@ function Panel({
               </ul>
             )}
             <p className="mt-1 text-xs text-slate-400">등록 요청은 예식장 정보를 Claude에게 주면 지도에 추가해요. ‘등록 완료’는 표시만 바꿔요.</p>
+          </section>
+
+          <section>
+            <h3 className="text-sm font-bold">수정 건의사항 {feedback.length}</h3>
+            {feedback.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-400">새 건의사항이 없어요</p>
+            ) : (
+              <ul className="mt-1 divide-y divide-slate-100">
+                {feedback.map((f) => (
+                  <li key={f.id} className="py-3 text-sm">
+                    <p className="break-words whitespace-pre-line text-slate-800">{f.body}</p>
+                    <div className="mt-1.5 flex items-center justify-between gap-2">
+                      <span className="text-xs text-slate-400">
+                        {f.sender?.nickname ?? "회원"} · {new Date(f.created_at).toLocaleDateString("ko-KR")}
+                      </span>
+                      <button onClick={() => feedbackDone(f)} className="h-8 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white">
+                        처리 완료
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <Link href="/admin" className="block text-center text-xs text-slate-400 underline underline-offset-2">

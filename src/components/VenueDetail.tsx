@@ -587,20 +587,11 @@ function HallsTab({
                           {list.map((s) => (
                             <span
                               key={s.id}
-                              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm ${
-                                s.is_simultaneous
-                                  ? "bg-amber-100 text-amber-900"
-                                  : "bg-slate-100 text-slate-800"
-                              }`}
+                              className="inline-flex items-center rounded-lg bg-slate-100 px-2 py-1 text-sm text-slate-800"
                             >
                               <b className="font-semibold">
                                 {formatTime(s.start_time)}
                               </b>
-                              {s.is_simultaneous && (
-                                <span className="text-[11px] font-semibold">
-                                  겹침
-                                </span>
-                              )}
                             </span>
                           ))}
                         </div>
