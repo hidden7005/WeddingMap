@@ -339,6 +339,8 @@ export function ParkingEditor({
     venue.overtime_fee != null ? String(venue.overtime_fee) : "",
   );
   const [notes, setNotes] = useState(venue.parking_notes ?? "");
+  // 기본 10·30·60분 + DB에 들어 있는 단위(예: 5분, 15분)는 그대로 보여줌
+  const unitOptions = [...new Set([10, 30, 60, ...(venue.overtime_unit_minutes ? [venue.overtime_unit_minutes] : [])])].sort((a, b) => a - b);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -384,7 +386,7 @@ export function ParkingEditor({
       <Field label="초과 요금" hint="비워두면 '미입력'으로 표시돼요">
         <div className="flex items-center gap-2">
           <div className="flex shrink-0 rounded-xl border border-slate-200 bg-white p-0.5">
-            {[10, 15, 30, 60].map((u) => (
+            {unitOptions.map((u) => (
               <button
                 key={u}
                 type="button"
