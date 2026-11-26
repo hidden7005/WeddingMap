@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { isValidEmail, normalizeEmail } from "@/lib/members";
 import { TEAMS, suggestCode } from "@/lib/teams";
@@ -340,16 +339,6 @@ export default function LoginPage() {
           )}
         </div>
 
-        <p className="mt-6 text-center text-xs leading-relaxed text-slate-400">
-          한 계정은 한 기기에서만 로그인돼요.
-          <br />
-          다른 기기에서 로그인하면 이전 기기는 자동으로 로그아웃돼요.
-        </p>
-        <p className="mt-4 text-center text-sm">
-          <Link href="/" className="text-slate-500 underline-offset-2 hover:underline">
-            지도로 돌아가기
-          </Link>
-        </p>
       </div>
     </main>
   );
