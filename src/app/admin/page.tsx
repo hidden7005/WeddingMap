@@ -795,7 +795,13 @@ function VenueRequests() {
   }, [load]);
 
   async function setStatus(r: RequestRow, status: "done" | "rejected" | "pending") {
-    const { error } = await supabase.from("venue_requests").update({ status }).eq("id", r.id);
+    let reply: string | null | undefined;
+    if (status === "rejected") {
+      const v = window.prompt("반려 사유 (회원에게 보여요, 비워도 돼요)", r.reply ?? "");
+      if (v === null) return;
+      reply = v.trim().slice(0, 300) || null;
+    }
+    const { error } = await supabase.from("venue_requests").update(reply === undefined ? { status } : { status, reply }).eq("id", r.id);
     if (error) return alert("처리하지 못했어요: " + error.message);
     load();
   }

@@ -376,7 +376,9 @@ export type Database = {
         Row: {
           body: string
           created_at: string
+          handled_at: string | null
           id: string
+          reply: string | null
           status: string
           user_id: string
         }
@@ -385,6 +387,7 @@ export type Database = {
         }
         Update: {
           status?: string
+          reply?: string | null
         }
         Relationships: [
           {
@@ -403,6 +406,7 @@ export type Database = {
           id: string
           kind: string
           name: string
+          reply: string | null
           requested_by: string | null
           status: string
           venue_id: string | null
@@ -414,6 +418,7 @@ export type Database = {
         }
         Update: {
           status?: string
+          reply?: string | null
         }
         Relationships: [
           {

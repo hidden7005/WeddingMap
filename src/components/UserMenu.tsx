@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "./AuthProvider";
 import FeedbackDialog from "./FeedbackDialog";
+import MyRequests, { useNewResults } from "./MyRequests";
 
 const KAKAO_ENABLED = process.env.NEXT_PUBLIC_KAKAO_LOGIN === "on";
 
@@ -12,6 +13,8 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
   const { status, member, signOut, kakaoLinked, linkKakao } = useAuth();
   const [open, setOpen] = useState(false);
   const [feedback, setFeedback] = useState(false);
+  const [mine, setMine] = useState(false);
+  const [newResults, clearNewResults] = useNewResults(open);
   const [pendingCount, setPendingCount] = useState(0);
 
   // 관리자: 승인 대기 중인 가입 신청 수
@@ -65,7 +68,7 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
         }
         title={member.nickname}
       >
-        {pendingCount > 0 && <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-white bg-rose-600" aria-label="승인 대기 있음" />}
+        {(pendingCount > 0 || newResults > 0) && <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-white bg-rose-600" aria-label={newResults > 0 ? "요청 처리 결과 있음" : "승인 대기 있음"} />}
         {compact ? (
           member.nickname.slice(0, 1)
         ) : (
@@ -96,6 +99,10 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
               {pendingCount > 0 && <span className="rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white">신청 {pendingCount}</span>}
             </Link>
           )}
+          <button role="menuitem" onClick={() => (setOpen(false), setMine(true), clearNewResults())} className="flex w-full items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50">
+            내 요청
+            {newResults > 0 && <span className="rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white">결과 {newResults}</span>}
+          </button>
           <button role="menuitem" onClick={() => (setOpen(false), setFeedback(true))} className="block w-full px-4 py-2.5 text-left hover:bg-slate-50">
             수정 건의사항 보내기
           </button>
@@ -105,6 +112,7 @@ export default function UserMenu({ compact = false }: { compact?: boolean }) {
         </div>
       )}
       {feedback && <FeedbackDialog onClose={() => setFeedback(false)} />}
+      {mine && <MyRequests onClose={() => setMine(false)} />}
     </div>
   );
 }
@@ -114,6 +122,8 @@ function CompactMenu() {
   const { status, member, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const [feedback, setFeedback] = useState(false);
+  const [mine, setMine] = useState(false);
+  const [newResults, clearNewResults] = useNewResults(open);
   const [pendingCount, setPendingCount] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -147,7 +157,7 @@ function CompactMenu() {
         aria-label="메뉴"
         className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-900 shadow-sm"
       >
-        {pendingCount > 0 && <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-white bg-rose-600" aria-label="승인 대기 있음" />}
+        {(pendingCount > 0 || newResults > 0) && <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full border-2 border-white bg-rose-600" aria-label={newResults > 0 ? "요청 처리 결과 있음" : "승인 대기 있음"} />}
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
           <path d="M4 7h16M4 12h16M4 17h16" />
         </svg>
@@ -169,6 +179,10 @@ function CompactMenu() {
                   {pendingCount > 0 && <span className="rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white">신청 {pendingCount}</span>}
                 </Link>
               )}
+              <button role="menuitem" onClick={() => (setOpen(false), setMine(true), clearNewResults())} className="flex w-full items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50">
+                내 요청
+                {newResults > 0 && <span className="rounded-full bg-rose-600 px-2 py-0.5 text-xs font-semibold text-white">결과 {newResults}</span>}
+              </button>
               <button role="menuitem" onClick={() => (setOpen(false), setFeedback(true))} className="block w-full px-4 py-2.5 text-left hover:bg-slate-50">
                 수정 건의사항 보내기
               </button>
@@ -185,6 +199,7 @@ function CompactMenu() {
         </div>
       )}
       {feedback && <FeedbackDialog onClose={() => setFeedback(false)} />}
+      {mine && <MyRequests onClose={() => setMine(false)} />}
     </div>
   );
 }
