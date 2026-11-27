@@ -18,7 +18,7 @@ type Note = Tables<"venue_notes"> & { author: { nickname: string } | null };
 type Urls = Record<string, string>; // path → 서명 URL
 
 /**
- * 주차 / 촬영 특이사항: 회원이 글 + 사진(최대 4장)을 올리고 최신순으로 쌓임
+ * 주차 / 촬영 특이사항: 회원이 글 + 사진(최대 4장)을 올리고 먼저 쓴 순서대로 쌓임 (최신 글이 아래)
  *   [사진][사진][사진][사진]   ← 썸네일, 누르면 크게
  *   코멘트
  *   닉네임 · 날짜
@@ -40,7 +40,7 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
       .select("*, author:profiles!venue_notes_author_id_fkey(nickname)")
       .eq("venue_id", venueId)
       .eq("section", section)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: true }); // 먼저 쓴 글이 위, 최신 글이 아래
     if (e) {
       // DB(0008)가 아직 적용되지 않은 경우: 오류 대신 "준비 중"
       if (e.code === "PGRST205" || e.code === "42P01" || /venue_notes/.test(e.message ?? "")) return setNotReady(true);
