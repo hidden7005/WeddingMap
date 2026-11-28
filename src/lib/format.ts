@@ -26,13 +26,13 @@ export function formatTime(t: string | null | undefined): string {
 export function formatDate(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+  // 연도는 두 자리 (26.11.28)
+  return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /** 26.11.26 (연도 두 자리) */
 export function formatShortDate(iso: string | null | undefined): string | null {
-  const full = formatDate(iso);
-  return full ? full.slice(2) : null;
+  return formatDate(iso);
 }
 
 /** 확인일이 1년 넘게 지났는지 */

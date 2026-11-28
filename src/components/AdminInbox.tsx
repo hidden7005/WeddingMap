@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { formatDate } from "@/lib/format";
 import { removePhotoFiles, venuePhotoFiles } from "@/lib/venuePhotos";
 import { isValidMemberCode } from "@/lib/members";
 import { suggestCode, teamLabel } from "@/lib/teams";
@@ -198,7 +199,7 @@ function Panel({
                       {r.name}
                     </p>
                     <p className="mt-0.5 text-xs text-slate-400">
-                      {r.requester?.nickname ?? "회원"} · {new Date(r.created_at).toLocaleDateString("ko-KR")}
+                      {r.requester?.nickname ?? "회원"} · {formatDate(r.created_at)}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {r.kind === "delete" && r.venue_id && (
@@ -237,7 +238,7 @@ function Panel({
                     <p className="break-words whitespace-pre-line text-slate-800">{f.body}</p>
                     <div className="mt-1.5 flex items-center justify-between gap-2">
                       <span className="text-xs text-slate-400">
-                        {f.sender?.nickname ?? "회원"} · {new Date(f.created_at).toLocaleDateString("ko-KR")}
+                        {f.sender?.nickname ?? "회원"} · {formatDate(f.created_at)}
                       </span>
                       <button onClick={() => feedbackDone(f)} className="h-8 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white">
                         처리 완료

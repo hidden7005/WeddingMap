@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
+import { formatDate } from "@/lib/format";
 import { useAuth } from "./AuthProvider";
 
 /** 내 요청(등록·삭제 요청 + 수정 건의) 한 줄 */
@@ -120,7 +121,7 @@ export default function MyRequests({ onClose }: { onClose: () => void }) {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-[11px] font-semibold text-slate-400">
-                          {KIND[i.kind]} · {new Date(i.created_at).toLocaleDateString("ko-KR")}
+                          {KIND[i.kind]} · {formatDate(i.created_at)}
                           {isNew && <span className="ml-1.5 text-rose-600">새 결과</span>}
                         </p>
                         <p className="mt-0.5 line-clamp-3 break-words whitespace-pre-line text-slate-800">{i.title}</p>
