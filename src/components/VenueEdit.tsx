@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Tables } from "@/lib/database.types";
 import { HALL_TYPE } from "@/lib/labels";
-import { formatTime } from "@/lib/format";
+import { FREE_ALL_DAY, formatTime } from "@/lib/format";
 import { parseTimes } from "@/lib/times";
 
 /* ───────────────────────── 공통 ───────────────────────── */
@@ -374,9 +374,11 @@ export function ParkingEditor({
 }) {
   // 하객 무료 주차: [ ]시간 [ ]분 직접 입력, '무료 없음'은 따로 (DB: 0 = 없음, null = 모름)
   const g = venue.guest_free_minutes;
+  const allDayInit = g != null && g >= FREE_ALL_DAY;
   const [noFree, setNoFree] = useState(g === 0);
-  const [freeH, setFreeH] = useState(g ? String(Math.floor(g / 60) || "") : "");
-  const [freeM, setFreeM] = useState(g ? String(g % 60 || "") : "");
+  const [allDay, setAllDay] = useState(allDayInit);
+  const [freeH, setFreeH] = useState(g && !allDayInit ? String(Math.floor(g / 60) || "") : "");
+  const [freeM, setFreeM] = useState(g && !allDayInit ? String(g % 60 || "") : "");
   const [unit, setUnit] = useState<number>(
     venue.overtime_unit_minutes ?? 10,
   );
@@ -392,11 +394,11 @@ export function ParkingEditor({
   const feeNumber = fee.replace(/[^\d]/g, "");
   const digits = (v: string) => v.replace(/[^\d]/g, "").slice(0, 3);
   const freeTotal = Number(freeH || 0) * 60 + Number(freeM || 0);
-  const free: number | null = noFree ? 0 : freeTotal > 0 ? freeTotal : null;
+  const free: number | null = noFree ? 0 : allDay ? FREE_ALL_DAY : freeTotal > 0 ? freeTotal : null;
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!noFree && Number(freeM || 0) >= 60) return setError("분은 59분까지 적어주세요");
+    if (!noFree && !allDay && Number(freeM || 0) >= 60) return setError("분은 59분까지 적어주세요");
     setBusy(true);
     setError(null);
     const { error } = await supabase
@@ -420,11 +422,11 @@ export function ParkingEditor({
     >
       <Field label="하객 무료 주차">
         <div className="flex flex-wrap items-center gap-2">
-          <div className={`flex items-center gap-1.5 text-[15px] ${noFree ? "opacity-40" : ""}`}>
+          <div className={`flex items-center gap-1.5 text-[15px] ${noFree || allDay ? "opacity-40" : ""}`}>
             <input
               value={freeH}
               onChange={(e) => setFreeH(digits(e.target.value))}
-              disabled={noFree}
+              disabled={noFree || allDay}
               inputMode="numeric"
               aria-label="무료 시간"
               className="h-11 w-16 shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-center text-[15px] outline-none focus:border-slate-500"
@@ -434,7 +436,7 @@ export function ParkingEditor({
             <input
               value={freeM}
               onChange={(e) => setFreeM(digits(e.target.value))}
-              disabled={noFree}
+              disabled={noFree || allDay}
               inputMode="numeric"
               aria-label="무료 분"
               className="h-11 w-16 shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-center text-[15px] outline-none focus:border-slate-500"
@@ -442,7 +444,10 @@ export function ParkingEditor({
             />
             <span className="shrink-0">분 무료</span>
           </div>
-          <Chip on={noFree} onClick={() => setNoFree(!noFree)}>
+          <Chip on={allDay} onClick={() => (setAllDay(!allDay), setNoFree(false))}>
+            종일 무료
+          </Chip>
+          <Chip on={noFree} onClick={() => (setNoFree(!noFree), setAllDay(false))}>
             무료 없음
           </Chip>
         </div>
