@@ -12,7 +12,7 @@ import { thumbPath } from "@/lib/image";
 import { suggestCode, teamLabel } from "@/lib/teams";
 import { DAY_TYPE, EXTERNAL_SNAP_POLICY, FLASH_POLICY, GUEST_FREE_METHOD, HALL_TYPE, OFFICIAL_PHOTO_TIMING, PARKING_CAPACITY } from "@/lib/labels";
 import { useAuth } from "@/components/AuthProvider";
-import Logo, { APP_NAME } from "@/components/Logo";
+import Logo from "@/components/Logo";
 import { APP_VERSION } from "@/lib/version";
 
 type Stats = Views<"member_login_stats">;
@@ -106,7 +106,7 @@ function Admin({
           <Logo variant="wordmark" className="h-3 shrink-0 sm:h-4" />
           <span className="h-8 w-px shrink-0 bg-slate-300" aria-hidden />
           <span className="min-w-0 leading-tight">
-            <span className="block text-sm font-semibold whitespace-nowrap text-slate-600">{APP_NAME} 관리자</span>
+            <span className="block text-sm font-semibold whitespace-nowrap text-slate-600">관리자</span>
             <span className="block text-[11px] font-normal text-slate-400">v{APP_VERSION}</span>
           </span>
         </h1>
