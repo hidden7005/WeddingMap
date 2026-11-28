@@ -101,13 +101,16 @@ function Admin({
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-6">
-      <div className="flex items-center justify-between">
-        <h1 className="flex items-center gap-2.5">
-          <Logo variant="wordmark" className="h-4" />
-          <span className="h-5 w-px bg-slate-300" aria-hidden />
-          <span className="text-sm font-semibold text-slate-600">{APP_NAME} 관리자 <span className="ml-1 text-xs font-normal text-slate-400">v{APP_VERSION}</span></span>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h1 className="flex min-w-0 items-center gap-2 sm:gap-2.5">
+          <Logo variant="wordmark" className="h-3 shrink-0 sm:h-4" />
+          <span className="h-8 w-px shrink-0 bg-slate-300" aria-hidden />
+          <span className="min-w-0 leading-tight">
+            <span className="block text-sm font-semibold whitespace-nowrap text-slate-600">{APP_NAME} 관리자</span>
+            <span className="block text-[11px] font-normal text-slate-400">v{APP_VERSION}</span>
+          </span>
         </h1>
-        <Link href="/" className="text-sm text-slate-500 hover:text-slate-900">
+        <Link href="/" className="ml-auto shrink-0 text-sm whitespace-nowrap text-slate-500 hover:text-slate-900">
           지도로 돌아가기 ›
         </Link>
       </div>

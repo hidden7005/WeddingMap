@@ -25,6 +25,12 @@ export function formatDate(iso: string | null | undefined): string | null {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** 26.11.26 (연도 두 자리) */
+export function formatShortDate(iso: string | null | undefined): string | null {
+  const full = formatDate(iso);
+  return full ? full.slice(2) : null;
+}
+
 /** 확인일이 1년 넘게 지났는지 */
 export function isStale(iso: string | null | undefined, now = new Date()): boolean {
   if (!iso) return false;

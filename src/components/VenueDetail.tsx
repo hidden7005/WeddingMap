@@ -11,14 +11,7 @@ import {
   isHotel,
   label,
 } from "@/lib/labels";
-import {
-  formatDate,
-  formatMinutes,
-  formatTime,
-  isStale,
-  venueTitle,
-  formatOvertime,
-} from "@/lib/format";
+import { formatDate, formatMinutes, formatTime, isStale, venueTitle, formatOvertime, formatShortDate } from "@/lib/format";
 import type { VenuePin } from "@/lib/sites";
 import VenueNotes, { Linkify } from "./VenueNotes";
 import { AdminVenueActions, VenueDeleteRequest } from "./VenueRequest";
@@ -335,7 +328,7 @@ function Checked({
   const stale = isStale(at);
   return (
     <p className={`text-[11px] ${stale ? "text-amber-600" : "text-slate-400"}`}>
-      최종 확인 {formatDate(at)}
+      입력일 {formatShortDate(at)}
       {by ? ` · ${by}` : ""}
       {stale ? " · 1년 넘은 정보예요" : ""}
     </p>
