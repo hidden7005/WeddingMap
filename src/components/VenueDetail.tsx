@@ -640,21 +640,8 @@ function HallsTab({
                     ))}
                   </div>
                 ) : (
-                  // 시작 시각을 모를 때만 예식 간격
                   <p className="mt-2 text-sm text-slate-500">
-                    {h.interval_minutes ? (
-                      <>
-                        예식 간격{" "}
-                        <b className="font-semibold text-slate-800">
-                          {h.interval_minutes}분
-                        </b>
-                        <span className="ml-1.5 text-xs text-slate-400">
-                          시작 시간 미확인
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-slate-300">시간표 미입력</span>
-                    )}
+                    <span className="text-slate-300">시간표 미입력</span>
                     {/* 로그인한 회원은 바로 시간 입력 */}
                     {canEdit && (
                       <button
