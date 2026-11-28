@@ -445,7 +445,7 @@ export function ParkingEditor({
             <span className="shrink-0">분 무료</span>
           </div>
           <Chip on={allDay} onClick={() => (setAllDay(!allDay), setNoFree(false))}>
-            종일 무료
+            무료
           </Chip>
           <Chip on={noFree} onClick={() => (setNoFree(!noFree), setAllDay(false))}>
             무료 없음

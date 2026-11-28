@@ -1,10 +1,10 @@
-/** 하객 무료 주차 '종일 무료'(시간 제한 없음)는 1440분(24시간)으로 저장 */
+/** 하객 무료 주차 '무료'(시간 제한 없음)는 1440분(24시간)으로 저장 */
 export const FREE_ALL_DAY = 1440;
 
 export function formatMinutes(min: number | null | undefined): string | null {
   if (min == null) return null;
   if (min === 0) return "없음";
-  if (min >= FREE_ALL_DAY) return "종일 무료";
+  if (min >= FREE_ALL_DAY) return "무료";
   const h = Math.floor(min / 60);
   const m = min % 60;
   if (h && m) return `${h}시간 ${m}분`;

@@ -53,7 +53,7 @@ test("포맷", () => {
   assert.equal(formatMinutes(120), "2시간");
   assert.equal(formatMinutes(90), "1시간 30분");
   assert.equal(formatMinutes(30), "30분");
-  assert.equal(formatMinutes(1440), "종일 무료");
+  assert.equal(formatMinutes(1440), "무료");
   const now = new Date("2026-11-08T00:00:00Z");
   assert.equal(isStale("2025-11-01T00:00:00Z", now), true);
   assert.equal(isStale("2026-01-01T00:00:00Z", now), false);
