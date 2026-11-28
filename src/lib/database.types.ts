@@ -372,6 +372,26 @@ export type Database = {
           },
         ]
       }
+      note_likes: {
+        Row: {
+          created_at: string
+          note_id: string
+          user_id: string
+        }
+        Insert: {
+          note_id: string
+        }
+        Update: Record<string, never>
+        Relationships: [
+          {
+            foreignKeyName: "note_likes_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "venue_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feedback: {
         Row: {
           body: string

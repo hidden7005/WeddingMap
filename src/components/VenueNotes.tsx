@@ -14,7 +14,7 @@ const MAX_PHOTOS = 4;
 const MAX_BODY = 500;
 const URL_TTL_SEC = 60 * 60;
 
-type Note = Tables<"venue_notes"> & { author: { nickname: string } | null };
+type Note = Tables<"venue_notes"> & { author: { nickname: string } | null; likes: { user_id: string }[] };
 type Urls = Record<string, string>; // path → 서명 URL
 
 /**
@@ -37,7 +37,7 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
     setError(null);
     const { data, error: e } = await supabase
       .from("venue_notes")
-      .select("*, author:profiles!venue_notes_author_id_fkey(nickname)")
+      .select("*, author:profiles!venue_notes_author_id_fkey(nickname), likes:note_likes(user_id)")
       .eq("venue_id", venueId)
       .eq("section", section)
       .order("created_at", { ascending: true }); // 먼저 쓴 글이 위, 최신 글이 아래
@@ -64,6 +64,19 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
 
   const myId = session?.user.id;
   const isAdmin = member?.role === "admin";
+
+  // 좋아요: 누르면 바로 화면에 반영하고, 실패하면 되돌림
+  async function toggleLike(n: Note) {
+    if (!myId) return;
+    const before = n.likes ?? [];
+    const liked = before.some((l) => l.user_id === myId);
+    const patch = (likes: Note["likes"]) => setNotes((cur) => cur?.map((x) => (x.id === n.id ? { ...x, likes } : x)) ?? cur);
+    patch(liked ? before.filter((l) => l.user_id !== myId) : [...before, { user_id: myId }]);
+    const { error: e } = liked
+      ? await supabase.from("note_likes").delete().eq("note_id", n.id).eq("user_id", myId)
+      : await supabase.from("note_likes").insert({ note_id: n.id });
+    if (e && e.code !== "23505") patch(before);
+  }
 
   async function remove(n: Note) {
     if (!confirm("특이사항을 삭제할까요?")) return;
@@ -124,8 +137,16 @@ export default function VenueNotes({ venueId, section }: { venueId: string; sect
               )}
               {n.body && <p className="text-sm break-words whitespace-pre-line text-slate-800"><Linkify text={n.body} /></p>}
               <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-slate-400">
-                <span>
-                  {n.author?.nickname ?? "탈퇴한 회원"} · {formatDate(n.created_at)}
+                <span className="flex items-center gap-2">
+                  <span>
+                    {n.author?.nickname ?? "탈퇴한 회원"} · {formatDate(n.created_at)}
+                  </span>
+                  <LikeButton
+                    count={n.likes?.length ?? 0}
+                    liked={!!myId && (n.likes ?? []).some((l) => l.user_id === myId)}
+                    disabled={status !== "member"}
+                    onClick={() => toggleLike(n)}
+                  />
                 </span>
                 {status === "member" && (n.author_id === myId || isAdmin) && (
                   <span className="flex gap-1">
@@ -344,6 +365,28 @@ function Composer({
         </div>
       </div>
     </div>
+  );
+}
+
+/* ───────────────────────── 좋아요 ───────────────────────── */
+
+function LikeButton({ count, liked, disabled, onClick }: { count: number; liked: boolean; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={liked}
+      aria-label={liked ? "좋아요 취소" : "좋아요"}
+      className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold disabled:cursor-default ${
+        liked ? "text-rose-600" : "text-slate-400 enabled:hover:bg-slate-100 enabled:hover:text-slate-600"
+      }`}
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2" aria-hidden>
+        <path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3.2 5 6.6 5c2 0 3.4 1.1 4.4 2.5C12 6.1 13.4 5 15.4 5c3.4 0 5.4 3.6 4.1 6.8C19.5 16.4 12 21 12 21Z" />
+      </svg>
+      {count > 0 && count}
+    </button>
   );
 }
 
